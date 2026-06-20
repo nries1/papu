@@ -1,0 +1,14 @@
+{
+  "water_status_complete": "complete",
+  "water_action_on": "WATER_ON",
+  "water_level_topic": "home/plants/water_level",
+  "pump_topic_template": "plants/{device_id}/pump",
+  "pump_topic": "plants/{device_id}/pump",
+  "pump_cycle_complete_topic": "home/plants/feedback",
+  "pump_cycle_cooldown_hours": 6,
+  "environment_temp_1f_topic": "home/sensors/temperature",
+  "environment_humidity_1f_topic": "home/sensors/humidity",
+  "environment_pressure_1f_topic": "home/sensors/pressure",
+  "environment_gas_1f_topic": "home/sensors/iaq",
+  "device_logs_topic": "home/devices/logs"
+}

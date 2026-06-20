@@ -1,0 +1,369 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Plant Controller | Papu Home</title>
+    <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="css/dashboard.css" />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  </head>
+  <body>
+    <header>
+      <h1>System Control Dashboard</h1>
+      <div style="display:flex; align-items:center; gap:16px; flex-wrap:wrap;">
+        <a href="index.html">← Back to Home</a>
+        <label for="room-select" style="color:#e2e8f0; font-size:0.9rem;">Room:</label>
+        <select id="room-select" style="background:#1e293b; color:#e2e8f0; border:1px solid #334155; border-radius:6px; padding:4px 8px; font-size:0.9rem;">
+          <option value="">Loading...</option>
+        </select>
+      </div>
+    </header>
+
+    <div class="dashboard-grid">
+      <div class="card">
+        <h3>Moisture Sensors</h3>
+        <div id="moisture-levels">
+          <div>
+            Device 1 (Fiddle Leaf): <span class="status-good">65%</span>
+          </div>
+          <div>Device 2 (Pothos): <span class="status-alert">22%</span></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Environment</h3>
+        <div class="metric"><span id="home-temp">—</span>°F</div>
+        <p id="temp-label">Temperature</p>
+      </div>
+
+      <div class="card">
+        <h3>Water Tank Status</h3>
+        <div class="metric"><span id="tank-gallons">...</span> / 30</div>
+        <p>Gallons Remaining</p>
+        <hr style="margin: 10px 0; border: 0; border-top: 1px solid #eee" />
+        <div style="font-size: 0.9rem">
+          <strong>Frequency:</strong>
+          <span id="readings-per-week">0</span> updates this week
+        </div>
+      </div>
+
+      <div class="card" style="grid-column: span 2">
+        <h3>Sensor Health (7-Day Stability)</h3>
+        <div style="display: flex; gap: 20px">
+          <div style="flex: 1">
+            <canvas id="stabilityChart"></canvas>
+          </div>
+          <div
+            id="stats-panel"
+            style="min-width: 150px; font-size: 0.85rem; line-height: 1.6"
+          >
+            <strong>Distribution Stats:</strong><br />
+            Mean: <span id="stat-mean">-</span><br />
+            Median: <span id="stat-median">-</span><br />
+            Mode: <span id="stat-mode">-</span><br />
+            Min/Max: <span id="stat-min">-</span> / <span id="stat-max">-</span
+            ><br />
+            <strong>Std Dev (Jitter):</strong>
+            <span id="stat-sd" class="status-good">-</span>
+          </div>
+        </div>
+        <p style="font-size: 0.75rem; color: #666; margin-top: 10px">
+          *Target Jitter: < 12.0 (Lower is better)
+        </p>
+      </div>
+
+      <div class="card">
+        <h3>Manual Override</h3>
+        <label for="water-duration">Duration (seconds):</label>
+        <input
+          type="number"
+          id="water-duration"
+          min="10"
+          max="90"
+          step="10"
+          value="10"
+          style="width: 70px; margin-right: 8px"
+        />
+        <button id="water-now">WATER NOW</button>
+      </div>
+
+      <div class="card">
+        <h3>Scheduling</h3>
+        <label for="interval">Cycle Interval (Hours):</label>
+        <input type="number" id="interval" value="12" style="width: 60px" />
+        <button onclick="saveInterval()">Update</button>
+
+        <div
+          id="last-watering-callout"
+          style="
+            margin-top: 16px;
+            padding: 14px;
+            background: rgba(56, 189, 248, 0.08);
+            border: 1px solid rgba(56, 189, 248, 0.2);
+            border-radius: 12px;
+            color: #e2e8f0;
+            font-size: 0.95rem;
+          "
+        >
+          <strong>Last watering completed:</strong>
+          <div id="last-watering-info" style="margin-top: 8px; color: #cbd5e1">
+            Loading recent completion...
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Robot Vision <span id="vision-live-dot" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#475569;margin-left:6px;vertical-align:middle;transition:background 0.3s;"></span></h3>
+        <div id="vision-faces" style="margin-top:8px;font-size:0.95rem;color:#cbd5e1;">Waiting for frames...</div>
+        <div id="vision-last-seen" style="margin-top:8px;font-size:0.75rem;color:#64748b;"></div>
+      </div>
+
+      <div class="card" style="grid-column: 1 / -1">
+        <h3>Recent Watering History</h3>
+        <table style="width: 100%; text-align: left">
+          <thead>
+            <tr>
+              <th>Date/Time</th>
+              <th>Device</th>
+              <th>Duration</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody id="history-rows"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <script>
+      let selectedDeviceId = null;
+      let selectedRoomName = null;
+
+      async function loadRooms() {
+        try {
+          const resp = await fetch("/api/rooms");
+          const rooms = await resp.json();
+          const select = document.getElementById("room-select");
+          select.innerHTML = "";
+          rooms.forEach((r, i) => {
+            const opt = document.createElement("option");
+            opt.value = r.name;
+            opt.textContent = r.display_name;
+            opt.dataset.displayName = r.display_name;
+            opt.dataset.devices = JSON.stringify(r.devices || []);
+            if (i === 0) opt.selected = true;
+            select.appendChild(opt);
+          });
+          if (rooms.length > 0) applyRoomSelection(select.options[0]);
+          select.addEventListener("change", () => {
+            applyRoomSelection(select.options[select.selectedIndex]);
+          });
+          loadHistory();
+          readWaterLevel();
+          checkCanWater();
+        } catch (e) {
+          console.error("Failed to load rooms", e);
+        }
+      }
+
+      function applyRoomSelection(option) {
+        selectedRoomName = option.value;
+        const devices = JSON.parse(option.dataset.devices || "[]");
+        selectedDeviceId = devices.length > 0 ? devices[0].device_id : null;
+        document.getElementById("temp-label").textContent =
+          option.dataset.displayName + " Temperature";
+        loadLatestTemperature();
+        loadHistory();
+        readWaterLevel();
+        checkCanWater();
+        loadSensorHealth();
+      }
+
+      async function checkCanWater() {
+        try {
+          const qs = selectedDeviceId ? "?device_id=" + selectedDeviceId : "";
+          const response = await fetch("/api/can-water" + qs);
+          const data = await response.json();
+          const waterButton = document.getElementById("water-now");
+          if (!data.canWater) {
+            waterButton.disabled = true;
+            waterButton.style.opacity = "0.5";
+            waterButton.style.cursor = "not-allowed";
+            waterButton.title = data.disabledReasons.join("\n");
+          } else {
+            waterButton.disabled = false;
+            waterButton.style.opacity = "1";
+            waterButton.style.cursor = "pointer";
+            waterButton.title = "";
+          }
+        } catch (error) {
+          console.error("Error checking watering eligibility:", error);
+        }
+      }
+
+      document.getElementById("water-now").addEventListener("click", async () => {
+        try {
+          const durationSeconds = Math.min(90, Math.max(10,
+            parseInt(document.getElementById("water-duration").value, 10) || 10));
+          const response = await fetch("/api/admin/water", {
+            method: "POST",
+            body: JSON.stringify({
+              device_id: selectedDeviceId,
+              action: "WATER_ON",
+              duration_seconds: durationSeconds,
+            }),
+            headers: { "Content-Type": "application/json" },
+          });
+          const result = await response.json();
+          alert(result.message);
+          loadHistory();
+        } catch (error) {
+          console.error("Error watering now:", error);
+          alert("Failed to water. Please try again.");
+        }
+      });
+
+      async function loadHistory() {
+        const qs = selectedDeviceId ? "&device_id=" + selectedDeviceId : "";
+        const response = await fetch("/api/watering-history?page=0&rows=10" + qs);
+        const logs = await response.json();
+        const tableBody = document.getElementById("history-rows");
+        tableBody.innerHTML = "";
+        logs.forEach((log) => {
+          const row = "<tr><td>" + new Date(log.timestamp).toLocaleString() + "</td><td>" +
+            log.device_id + "</td><td>" + (log.duration_ms && log.duration_ms / 1000) +
+            "s</td><td>" + log.status + "</td></tr>";
+          tableBody.insertAdjacentHTML("beforeend", row);
+        });
+        renderLastWateringCallout(logs);
+        checkCanWater();
+      }
+
+      function renderLastWateringCallout(logs) {
+        const callout = document.getElementById("last-watering-info");
+        if (!logs || !logs.length) {
+          callout.innerText = "No watering history available yet.";
+          return;
+        }
+        const latestComplete = logs.find((log) => log.status === "COMPLETE") || logs[0];
+        const completedAt = latestComplete.timestamp
+          ? new Date(latestComplete.timestamp).toLocaleString() : "Unknown time";
+        const durationSeconds = latestComplete.duration_ms
+          ? latestComplete.duration_ms / 1000 : "Unknown";
+        callout.innerHTML = "Completed: <strong>" + completedAt + "</strong><br/>Duration: <strong>" + durationSeconds + "s</strong>";
+      }
+
+      async function readWaterLevel() {
+        const qs = selectedDeviceId ? "&device_id=" + selectedDeviceId : "";
+        const response = await fetch("/api/water-level?rows=1" + qs);
+        const mostRecentLevels = await response.json();
+        if (mostRecentLevels) {
+          document.getElementById("tank-gallons").innerText = mostRecentLevels.gallons;
+        }
+      }
+
+      async function loadSensorHealth() {
+        const qs = selectedDeviceId ? "?device_id=" + selectedDeviceId : "";
+        const response = await fetch("/api/stats/sensor-stability" + qs);
+        const data = await response.json();
+        const { median_value, mode_value, min_value, max_value, std_dev, mean_value, total_count } = data.metrics;
+        const history = data.dailyStdDev;
+        const sd = Number(std_dev);
+        document.getElementById("stat-mean").innerText = Number(mean_value).toFixed(2);
+        document.getElementById("stat-median").innerText = median_value;
+        document.getElementById("stat-mode").innerText = mode_value;
+        document.getElementById("stat-min").innerText = min_value;
+        document.getElementById("stat-max").innerText = max_value;
+        document.getElementById("readings-per-week").innerText = total_count;
+        const sdEl = document.getElementById("stat-sd");
+        sdEl.innerText = sd.toFixed(2);
+        sdEl.className = sd < 12 ? "status-good" : "status-alert";
+        renderChart(history);
+      }
+
+      function renderChart(historyData) {
+        const ctx = document.getElementById("stabilityChart").getContext("2d");
+        new Chart(ctx, {
+          type: "line",
+          data: {
+            labels: historyData.map((h) => h.day.slice(0, 10)),
+            datasets: [{
+              label: "Standard Deviation (Jitter)",
+              data: historyData.map((h) => Number(h.daily_stddev)),
+              borderColor: "#4a90e2",
+              tension: 0.3,
+              fill: true,
+              backgroundColor: "rgba(74, 144, 226, 0.1)",
+            }],
+          },
+          options: { responsive: true, scales: { y: { beginAtZero: false } } },
+        });
+      }
+
+      async function loadLatestTemperature() {
+        try {
+          const qs = selectedRoomName ? "?metric=temperature_f&room_name=" + encodeURIComponent(selectedRoomName) : "?metric=temperature_f";
+          const resp = await fetch("/api/environment/latest" + qs);
+          const tempEl = document.getElementById("home-temp");
+          if (!resp.ok) {
+            tempEl.innerText = "—";
+            return;
+          }
+          const data = await resp.json();
+          const val = data.readings && data.readings.value;
+          if (val !== undefined && val !== null && !isNaN(Number(val))) {
+            tempEl.innerText = Number(val).toFixed(1);
+          }
+        } catch (e) {
+          console.error("Failed to load latest temperature", e);
+        }
+      }
+
+      // Robot Vision SSE
+      (function () {
+        const dot = document.getElementById('vision-live-dot');
+        const facesEl = document.getElementById('vision-faces');
+        const lastSeenEl = document.getElementById('vision-last-seen');
+        let staleTimer = null;
+
+        function markStale() {
+          dot.style.background = '#475569';
+          facesEl.textContent = 'No frames received recently.';
+        }
+
+        const es = new EventSource('/api/vision/stream');
+        es.onmessage = (e) => {
+          let result;
+          try { result = JSON.parse(e.data); } catch (_) { return; }
+
+          dot.style.background = '#22c55e';
+          lastSeenEl.textContent = 'Last frame: ' + new Date(result.timestamp).toLocaleTimeString();
+
+          clearTimeout(staleTimer);
+          staleTimer = setTimeout(markStale, 5000);
+
+          const faces = result.faces || [];
+          if (!faces.length) {
+            facesEl.textContent = 'No faces detected.';
+            return;
+          }
+          facesEl.innerHTML = faces.map((f) => {
+            const conf = Math.round(f.confidence * 100);
+            const pan = f.pan_delta > 0 ? `→ ${f.pan_delta}` : `← ${Math.abs(f.pan_delta)}`;
+            const tilt = f.tilt_delta > 0 ? `↓ ${f.tilt_delta}` : `↑ ${Math.abs(f.tilt_delta)}`;
+            return `<div style="padding:4px 0;border-bottom:1px solid #1e293b;">
+              <strong style="color:#e2e8f0;">${f.name}</strong>
+              <span style="color:#94a3b8;font-size:0.85rem;margin-left:8px;">${conf}% conf</span>
+              <span style="color:#64748b;font-size:0.8rem;margin-left:8px;">${pan} ${tilt}</span>
+            </div>`;
+          }).join('');
+        };
+        es.onerror = () => { dot.style.background = '#ef4444'; };
+      })();
+
+      // Initialize
+      loadRooms();
+      loadSensorHealth();
+    </script>
+  </body>
+</html>

@@ -1,0 +1,665 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Robot Vision</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #080c14;
+      color: #c8d8f0;
+      font-family: 'Courier New', monospace;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 40px;
+    }
+
+    header {
+      font-size: 11px;
+      letter-spacing: 4px;
+      text-transform: uppercase;
+      color: #3a5a8a;
+    }
+
+    #scene {
+      perspective: 700px;
+    }
+
+    #head {
+      display: block;
+      transition: transform 180ms ease-out;
+      transform-origin: 110px 140px;
+    }
+
+    .eye-group {
+      transition: transform 180ms ease-out;
+    }
+
+    #status {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      width: 380px;
+    }
+
+    .stat {
+      background: #0c1420;
+      border: 1px solid #1a2a40;
+      border-radius: 6px;
+      padding: 10px 12px;
+      text-align: center;
+    }
+
+    .stat-label {
+      font-size: 8px;
+      letter-spacing: 2px;
+      color: #3a5a8a;
+      margin-bottom: 6px;
+    }
+
+    .stat-value {
+      font-size: 15px;
+      font-weight: bold;
+      color: #7ab0e0;
+    }
+
+    /* Voice section */
+    #voice-section {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 14px;
+      width: 380px;
+    }
+
+    #speak-btn {
+      width: 72px;
+      height: 72px;
+      border-radius: 50%;
+      border: 2px solid #2a4a7a;
+      background: #0c1420;
+      color: #7ab0e0;
+      font-family: 'Courier New', monospace;
+      font-size: 9px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: border-color 200ms, background 200ms, color 200ms;
+      outline: none;
+    }
+
+    #speak-btn:hover               { border-color: #4a7aaa; }
+    #speak-btn.listening           { border-color: #3a9a6a; background: #0c1a14; color: #3a9a6a; }
+    #speak-btn.thinking            { border-color: #9a8a20; background: #141208; color: #9a8a20; }
+    #speak-btn.speaking            { border-color: #1a6aaa; background: #0c1420; color: #50b0ff; }
+
+    #speech-state {
+      font-size: 9px;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: #3a5a8a;
+      min-height: 14px;
+    }
+
+    #transcript {
+      width: 380px;
+      display: none;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .transcript-row {
+      background: #0c1420;
+      border: 1px solid #1a2a40;
+      border-radius: 6px;
+      padding: 10px 14px;
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    .transcript-label {
+      font-size: 8px;
+      letter-spacing: 2px;
+      color: #3a5a8a;
+      margin-bottom: 4px;
+    }
+
+    #conn {
+      font-size: 9px;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: #3a5a8a;
+    }
+    #conn.on  { color: #3a9a6a; }
+    #conn.off { color: #9a3a3a; }
+
+    /* Chat */
+    #chat-section {
+      width: 380px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    #chat-log {
+      background: #0c1420;
+      border: 1px solid #1a2a40;
+      border-radius: 6px;
+      padding: 12px 14px;
+      height: 180px;
+      overflow-y: auto;
+      font-size: 12px;
+      line-height: 1.6;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .chat-you   { color: #c8d8f0; }
+    .chat-robot { color: #7ab0e0; }
+    .chat-label { color: #3a5a8a; margin-right: 4px; font-size: 9px; letter-spacing: 2px; text-transform: uppercase; }
+    .chat-err   { color: #9a3a3a; font-size: 10px; }
+
+    #chat-input-row {
+      display: flex;
+      gap: 8px;
+    }
+
+    #chat-input {
+      flex: 1;
+      background: #0c1420;
+      border: 1px solid #1a2a40;
+      border-radius: 6px;
+      padding: 8px 12px;
+      font-family: 'Courier New', monospace;
+      font-size: 12px;
+      color: #c8d8f0;
+      outline: none;
+    }
+    #chat-input:focus { border-color: #2a4a7a; }
+
+    #chat-send {
+      background: #0c1420;
+      border: 1px solid #2a4a7a;
+      border-radius: 6px;
+      padding: 8px 16px;
+      font-family: 'Courier New', monospace;
+      font-size: 9px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: #7ab0e0;
+      cursor: pointer;
+      transition: border-color 200ms;
+    }
+    #chat-send:hover { border-color: #4a7aaa; }
+
+    /* Camera feed */
+    #camera-feed {
+      width: 380px;
+      border-radius: 6px;
+      border: 1px solid #1a2a40;
+      background: #0c1420;
+      display: block;
+    }
+    #camera-error {
+      width: 380px;
+      text-align: center;
+      font-size: 9px;
+      letter-spacing: 2px;
+      color: #9a3a3a;
+      text-transform: uppercase;
+    }
+  </style>
+</head>
+<body>
+
+<header>Robot Vision Monitor</header>
+
+<div id="scene">
+  <svg id="head" width="220" height="260" viewBox="0 0 220 260" xmlns="http://www.w3.org/2000/svg">
+    <!-- Antenna -->
+    <line x1="110" y1="10" x2="110" y2="36" stroke="#2a4a7a" stroke-width="3" stroke-linecap="round"/>
+    <circle cx="110" cy="8" r="7" fill="#0c1828" stroke="#3a6aaa" stroke-width="1.5"/>
+    <circle id="antenna-light" cx="110" cy="8" r="3.5" fill="#2a4a7a"/>
+
+    <!-- Head -->
+    <rect x="20" y="36" width="180" height="196" rx="18" fill="#0c1828" stroke="#2a4a7a" stroke-width="1.5"/>
+
+    <!-- Ears -->
+    <rect x="8"   y="86" width="14" height="36" rx="4" fill="#0c1828" stroke="#2a4a7a" stroke-width="1.5"/>
+    <rect x="198" y="86" width="14" height="36" rx="4" fill="#0c1828" stroke="#2a4a7a" stroke-width="1.5"/>
+
+    <!-- Eye sockets -->
+    <circle cx="78"  cy="126" r="32" fill="#060d18" stroke="#1e3860" stroke-width="1.5"/>
+    <circle cx="142" cy="126" r="32" fill="#060d18" stroke="#1e3860" stroke-width="1.5"/>
+
+    <!-- Left eye -->
+    <g id="eye-l" class="eye-group">
+      <circle cx="78"  cy="126" r="18" fill="#1260a0"/>
+      <circle cx="78"  cy="126" r="9"  fill="#061018"/>
+      <circle cx="83"  cy="120" r="5"  fill="#50b0ff" opacity="0.85"/>
+    </g>
+
+    <!-- Right eye -->
+    <g id="eye-r" class="eye-group">
+      <circle cx="142" cy="126" r="18" fill="#1260a0"/>
+      <circle cx="142" cy="126" r="9"  fill="#061018"/>
+      <circle cx="147" cy="120" r="5"  fill="#50b0ff" opacity="0.85"/>
+    </g>
+
+    <!-- Mouth track -->
+    <rect x="60" y="192" width="100" height="14" rx="7" fill="#060d18" stroke="#1e3860" stroke-width="1.5"/>
+    <!-- Mouth fill grows with confidence / animates while speaking -->
+    <rect id="mouth" x="62" y="194" width="10" height="10" rx="5" fill="#1260a0"/>
+  </svg>
+</div>
+
+<div id="status">
+  <div class="stat">
+    <div class="stat-label">Name</div>
+    <div class="stat-value" id="s-name">—</div>
+  </div>
+  <div class="stat">
+    <div class="stat-label">Conf</div>
+    <div class="stat-value" id="s-conf">—</div>
+  </div>
+  <div class="stat">
+    <div class="stat-label">Pan</div>
+    <div class="stat-value" id="s-pan">—</div>
+  </div>
+  <div class="stat">
+    <div class="stat-label">Tilt</div>
+    <div class="stat-value" id="s-tilt">—</div>
+  </div>
+</div>
+
+<video id="camera-feed" autoplay muted playsinline></video>
+<div id="camera-error" style="display:none">camera unavailable</div>
+
+<div id="voice-section">
+  <button id="speak-btn">mic</button>
+  <div id="speech-state"></div>
+</div>
+
+<div id="transcript">
+  <div class="transcript-row">
+    <div class="transcript-label">You said</div>
+    <div id="user-text"></div>
+  </div>
+  <div class="transcript-row">
+    <div class="transcript-label">Robot</div>
+    <div id="robot-text"></div>
+  </div>
+</div>
+
+<div id="conn" class="off">● disconnected</div>
+
+<div id="chat-section">
+  <div id="chat-log"></div>
+  <div id="chat-input-row">
+    <input type="text" id="chat-input" placeholder="Type a message…" autocomplete="off" />
+    <button id="chat-send">send</button>
+  </div>
+</div>
+
+<script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_detection@0.4.1646425229/face_detection.js" crossorigin="anonymous"></script>
+<script>
+  // Config
+  let config = {};
+  let displayNames = {};
+
+  async function loadConfig() {
+    try {
+      const res = await fetch('/api/config');
+      if (res.ok) config = await res.json();
+    } catch (e) { console.error('Failed to load config', e); }
+  }
+
+  async function loadDisplayNames() {
+    try {
+      const res = await fetch('/api/users/display-names');
+      if (res.ok) displayNames = await res.json();
+    } catch (e) { console.error('Failed to load display names', e); }
+  }
+
+  function resolveName(name) {
+    return displayNames[name] || name;
+  }
+
+  // DOM refs
+  const head         = document.getElementById('head');
+  const eyeL         = document.getElementById('eye-l');
+  const eyeR         = document.getElementById('eye-r');
+  const mouth        = document.getElementById('mouth');
+  const antennaLight = document.getElementById('antenna-light');
+  const sName        = document.getElementById('s-name');
+  const sConf        = document.getElementById('s-conf');
+  const sPan         = document.getElementById('s-pan');
+  const sTilt        = document.getElementById('s-tilt');
+  const conn         = document.getElementById('conn');
+  const speakBtn     = document.getElementById('speak-btn');
+  const speechState  = document.getElementById('speech-state');
+  const transcriptEl = document.getElementById('transcript');
+  const userTextEl   = document.getElementById('user-text');
+  const robotTextEl  = document.getElementById('robot-text');
+
+  // -------------------------------------------------------------------------
+  // Vision state
+  // -------------------------------------------------------------------------
+  let lastRecognizedName = null;
+  let returnTimer        = null;
+  // Names greeted this session — reset after 2 min absence so returning feels natural
+  const greetedAt = {};
+
+  function setPose(pan, tilt) {
+    head.style.transform = `rotateY(${pan * 60}deg) rotateX(${-tilt * 40}deg)`;
+    eyeL.style.transform = `translate(${pan * 10}px, ${tilt * 7}px)`;
+    eyeR.style.transform = `translate(${pan * 10}px, ${tilt * 7}px)`;
+  }
+
+  // Fast path: local Haar detection → head pose only
+  function onTracking(result) {
+    if (returnTimer) { clearTimeout(returnTimer); returnTimer = null; }
+    const faces = result.faces || [];
+    if (!faces.length) {
+      sPan.textContent  = '—';
+      sTilt.textContent = '—';
+      returnTimer = setTimeout(() => setPose(0, 0), 800);
+      return;
+    }
+    const f = faces[0];
+    setPose(f.pan_delta, f.tilt_delta);
+    sPan.textContent  = (f.pan_delta  >= 0 ? '+' : '') + f.pan_delta.toFixed(3);
+    sTilt.textContent = (f.tilt_delta >= 0 ? '+' : '') + f.tilt_delta.toFixed(3);
+  }
+
+  // Slow path: CNN recognition → name + confidence only (pan/tilt handled by MediaPipe)
+  function onRecognition(result) {
+    const faces = result.faces || [];
+    if (!faces.length) {
+      sName.textContent = '—';
+      sConf.textContent = '—';
+      mouth.setAttribute('width', '10');
+      antennaLight.setAttribute('fill', '#2a4a6a');
+      lastRecognizedName = null;
+      return;
+    }
+    const f = faces[0];
+    const resolvedName = resolveName(f.name);
+    sName.textContent = resolvedName;
+    sConf.textContent = (f.confidence * 100).toFixed(0) + '%';
+    mouth.setAttribute('width', Math.max(10, Math.round(f.confidence * 96)));
+    antennaLight.setAttribute('fill', f.name === 'unknown' ? '#aa7020' : '#20aa60');
+
+    if (f.name !== 'unknown') {
+      const now = Date.now();
+      const lastGreet = greetedAt[f.name] || 0;
+      if (now - lastGreet > 2 * 60 * 1000) {
+        greetedAt[f.name] = now;
+        robotSpeak(`Hello, ${resolvedName}!`);
+      }
+    }
+
+    lastRecognizedName = f.name !== 'unknown' ? resolvedName : null;
+  }
+
+  // -------------------------------------------------------------------------
+  // Voice state machine
+  // -------------------------------------------------------------------------
+  // state: idle | listening | thinking | speaking
+  let voiceState  = 'idle';
+  let recognition = null;
+  let mouthTimer  = null;
+
+  function setVoiceState(state) {
+    voiceState = state;
+    speakBtn.className = state === 'idle' ? '' : state;
+    const labels = { idle: '', listening: 'listening…', thinking: 'thinking…', speaking: 'speaking…' };
+    speechState.textContent = labels[state] || '';
+  }
+
+  // -------------------------------------------------------------------------
+  // TTS + mouth animation
+  // -------------------------------------------------------------------------
+  function robotSpeak(text) {
+    if (mouthTimer) { clearInterval(mouthTimer); mouthTimer = null; }
+    speechSynthesis.cancel();
+
+    robotTextEl.textContent = text;
+    transcriptEl.style.display = 'flex';
+
+    setVoiceState('speaking');
+
+    const utter = new SpeechSynthesisUtterance(text);
+    utter.rate  = 1.0;
+    utter.pitch = 1.0;
+
+    mouthTimer = setInterval(() => {
+      if (!speechSynthesis.speaking) {
+        clearInterval(mouthTimer);
+        mouthTimer = null;
+        mouth.setAttribute('width', '10');
+        setVoiceState('idle');
+        return;
+      }
+      mouth.setAttribute('width', String(Math.round(12 + Math.random() * 70)));
+    }, 90);
+
+    speechSynthesis.speak(utter);
+  }
+
+  // -------------------------------------------------------------------------
+  // LLM
+  // -------------------------------------------------------------------------
+  async function askLLM(userText) {
+    setVoiceState('thinking');
+
+    const who = lastRecognizedName
+      ? `You are looking at ${lastRecognizedName}, a member of the household.`
+      : 'You cannot identify the person in front of you.';
+
+    const system = `You are Papu, a friendly home robot assistant. ${who} Reply in 1–2 short sentences. Be warm and natural.`;
+
+    try {
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: userText, system }),
+      });
+      const data = await res.json();
+      robotSpeak(data.reply || "Sorry, I couldn't think of a response.");
+    } catch {
+      setVoiceState('idle');
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // STT
+  // -------------------------------------------------------------------------
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+  function startListening() {
+    if (voiceState !== 'idle') return;
+    if (!SpeechRecognition) {
+      alert('Speech recognition is not supported in this browser. Try Chrome or Safari.');
+      return;
+    }
+
+    recognition = new SpeechRecognition();
+    recognition.lang            = 'en-US';
+    recognition.interimResults  = false;
+    recognition.maxAlternatives = 1;
+
+    recognition.onstart = () => setVoiceState('listening');
+
+    recognition.onresult = (e) => {
+      const text = e.results[0][0].transcript.trim();
+      userTextEl.textContent     = text;
+      robotTextEl.textContent    = '…';
+      transcriptEl.style.display = 'flex';
+      askLLM(text);
+    };
+
+    recognition.onerror = () => setVoiceState('idle');
+    recognition.onend   = () => { if (voiceState === 'listening') setVoiceState('idle'); };
+
+    recognition.start();
+  }
+
+  speakBtn.addEventListener('click', () => {
+    if (voiceState === 'idle')      startListening();
+    else if (voiceState === 'listening') recognition?.stop();
+  });
+
+  // -------------------------------------------------------------------------
+  // MQTT
+  // -------------------------------------------------------------------------
+  const mqttUrl = location.protocol === 'https:'
+    ? `wss://${location.host}/mqtt`
+    : `ws://${location.hostname}:9001`;
+  const client = mqtt.connect(mqttUrl);
+
+  client.on('connect', () => {
+    conn.textContent = '● connected';
+    conn.className   = 'on';
+    mqttReady = true;
+    client.subscribe('robot/vision/tracking');
+    client.subscribe('robot/vision/result');
+    startPublishing();
+  });
+
+  client.on('offline', () => { conn.textContent = '● disconnected'; conn.className = 'off'; mqttReady = false; });
+  client.on('error',   () => { conn.textContent = '● error';        conn.className = 'off'; mqttReady = false; });
+
+  client.on('message', (topic, payload) => {
+    try {
+      const data = JSON.parse(payload.toString());
+      if      (topic === 'robot/vision/tracking') onTracking(data);
+      else if (topic === 'robot/vision/result')   onRecognition(data);
+    } catch (e) { console.error(e); }
+  });
+
+  // -------------------------------------------------------------------------
+  // Camera + frame publishing
+  // -------------------------------------------------------------------------
+  const videoEl       = document.getElementById('camera-feed');
+  const captureCanvas = document.createElement('canvas');
+  captureCanvas.width  = 320;
+  captureCanvas.height = 240;
+  const captureCtx    = captureCanvas.getContext('2d');
+  let mqttReady       = false;
+
+  // Fast path: MediaPipe local detection for pan/tilt at ~10fps
+  const faceDetection = new FaceDetection({
+    locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_detection@0.4.1646425229/${f}`,
+  });
+  faceDetection.setOptions({ model: 'short', minDetectionConfidence: 0.5 });
+  faceDetection.onResults((results) => {
+    const detections = results.detections || [];
+    if (!detections.length) {
+      if (returnTimer) clearTimeout(returnTimer);
+      returnTimer = setTimeout(() => setPose(0, 0), 800);
+      return;
+    }
+    if (returnTimer) { clearTimeout(returnTimer); returnTimer = null; }
+    const box  = detections[0].boundingBox;
+    const pan  = Math.round((box.xCenter - 0.5) * 10000) / 10000;
+    const tilt = Math.round((box.yCenter - 0.5) * 10000) / 10000;
+    setPose(pan, tilt);
+    sPan.textContent  = (pan  >= 0 ? '+' : '') + pan.toFixed(3);
+    sTilt.textContent = (tilt >= 0 ? '+' : '') + tilt.toFixed(3);
+  });
+
+  async function startCamera() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { width: 320, height: 240, facingMode: 'user' },
+      });
+      videoEl.srcObject = stream;
+    } catch (e) {
+      console.warn('Camera unavailable:', e.message);
+      videoEl.style.display = 'none';
+      document.getElementById('camera-error').style.display = 'block';
+    }
+  }
+
+  function startPublishing() {
+    // Fast path: local MediaPipe detection for pan/tilt at 10fps
+    setInterval(async () => {
+      if (videoEl.readyState < 2) return;
+      await faceDetection.send({ image: videoEl });
+    }, 100);
+
+    // Slow path: publish frames to GPU worker for name/confidence at 3fps
+    setInterval(() => {
+      if (videoEl.readyState < 2 || !mqttReady) return;
+      captureCtx.drawImage(videoEl, 0, 0, 320, 240);
+      captureCanvas.toBlob(async (blob) => {
+        if (!blob) return;
+        const ab = await blob.arrayBuffer();
+        client.publish('robot/vision/frame', new Uint8Array(ab));
+      }, 'image/jpeg', 0.8);
+    }, 333);
+  }
+
+  startCamera();
+
+  // -------------------------------------------------------------------------
+  // Text chat
+  // -------------------------------------------------------------------------
+  const chatLog   = document.getElementById('chat-log');
+  const chatInput = document.getElementById('chat-input');
+
+  function appendChat(cls, label, text) {
+    const div = document.createElement('div');
+    div.className = cls;
+    div.innerHTML = `<span class="chat-label">${label}</span>${text}`;
+    chatLog.appendChild(div);
+    chatLog.scrollTop = chatLog.scrollHeight;
+  }
+
+  async function sendChat() {
+    const message = chatInput.value.trim();
+    if (!message) return;
+    chatInput.value = '';
+    appendChat('chat-you', 'you', message);
+    try {
+      const res  = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message }),
+      });
+      const data = await res.json();
+      appendChat('chat-robot', 'papus', data.reply || data.error || 'No response.');
+    } catch {
+      const err = document.createElement('div');
+      err.className   = 'chat-err';
+      err.textContent = 'error: could not reach the GPU.';
+      chatLog.appendChild(err);
+    }
+  }
+
+  document.getElementById('chat-send').addEventListener('click', sendChat);
+  chatInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') sendChat(); });
+
+  // Load AI summary as first chat message
+  (async () => {
+    await Promise.all([loadConfig(), loadDisplayNames()]);
+    try {
+      const res  = await fetch('/api/ai-summary');
+      if (!res.ok) throw new Error();
+      const data = await res.json();
+      const ts   = new Date(data.timestamp).toLocaleString();
+      appendChat('chat-robot', `papus (${ts})`, data.summary.replace(/\n/g, ' '));
+    } catch {
+      appendChat('chat-robot', 'papus', config.aiPlaceholder || 'How can I help?');
+    }
+  })();
+</script>
+</body>
+</html>

@@ -1,0 +1,110 @@
+services:
+  # The web server
+  nginx:
+    image: nginx:latest
+    ports: ['80:80']
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./html:/usr/share/nginx/html:ro
+      - ./secure-private-storage:/app/secure-private-storage:ro
+
+  # Your plant-node API (collecting data from the ESP32)
+  api:
+    build:
+      context: .
+      dockerfile: server/Dockerfile
+    volumes:
+      - ./secure-private-storage:/app/secure-private-storage
+      - ./shared:/app/server/shared
+    env_file:
+      - .env
+    ports:
+      - '5000:5000'
+
+  # The Database (PostgreSQL is great for time-series sensor data)
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      # Format: [Volume Name]:[Path Inside Container]
+      - postgres_data:/var/lib/postgresql/data
+
+  # The Hardware Builder (Utility container)
+  hardware-builder:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - .:/workspace
+    devices:
+      - '/dev/ttyACM0:/dev/ttyACM0' # Allows flashing from the container
+    profiles: ['tools'] # Only runs when explicitly called
+
+  mqtt-broker:
+    image: eclipse-mosquitto:latest
+    container_name: mqtt-broker
+    ports:
+      - '1883:1883'
+      - '9001:9001'
+    volumes:
+      - ./mosquitto/config/mosquitto.conf:/mosquitto/config/mosquitto.conf
+      - ./mosquitto/data:/mosquitto/data
+      - ./mosquitto/log:/mosquitto/log
+      # shared config mounted for other services/tools
+      - ./shared:/shared
+    restart: always
+  ollama:
+    image: ollama/ollama
+    container_name: ollama
+    profiles: ['gpu']
+    environment:
+      - OLLAMA_KEEP_ALIVE=-1
+    runtime: nvidia
+    ports:
+      - '11434:11434'
+    volumes:
+      - ./data/ollama:/root/.ollama
+    restart: unless-stopped
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:11434/api/tags']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+  robot-vision-worker:
+    build:
+      context: ./robot-vision-worker
+    container_name: robot-vision-worker
+    profiles: ['gpu']
+    runtime: nvidia
+    depends_on:
+      - mqtt-broker
+    volumes:
+      - ./robot-vision-worker/known_faces:/app/known_faces
+    environment:
+      - MQTT_BROKER_HOST=mqtt-broker
+      - MQTT_BROKER_PORT=1883
+      - RECOGNITION_THRESHOLD=0.55
+    restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+volumes:
+  postgres_data:
+    driver: local

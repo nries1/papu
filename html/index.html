@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" type="image/x-icon" href="/papu.ico" />
+    <link rel="apple-touch-icon" href="/papu.png" />
+    <title>Papus Home</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+    <style>
+      #robot-head {
+        display: block;
+        transition: transform 180ms ease-out;
+        transform-origin: 110px 140px;
+      }
+      .robot-eye-group { transition: transform 180ms ease-out; }
+      #speech-bubble {
+        position: relative;
+        background: #1e293b;
+        border: 1px solid #334155;
+        border-radius: 16px;
+        padding: 12px 20px;
+        max-width: 280px;
+        text-align: center;
+      }
+      #speech-bubble::after {
+        content: '';
+        position: absolute;
+        bottom: -10px;
+        left: 50%;
+        transform: translateX(-50%);
+        border-left: 10px solid transparent;
+        border-right: 10px solid transparent;
+        border-top: 10px solid #334155;
+      }
+      #speech-bubble::before {
+        content: '';
+        position: absolute;
+        bottom: -8px;
+        left: 50%;
+        transform: translateX(-50%);
+        border-left: 9px solid transparent;
+        border-right: 9px solid transparent;
+        border-top: 9px solid #1e293b;
+        z-index: 1;
+      }
+      .nav-bubble {
+        display: inline-block;
+        padding: 8px 18px;
+        border-radius: 9999px;
+        border: 1px solid;
+        background: rgba(15, 23, 42, 0.8);
+        font-size: 0.7rem;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        transition: background 150ms, box-shadow 150ms;
+        text-decoration: none;
+        white-space: nowrap;
+      }
+      .nav-bubble:hover {
+        background: rgba(30, 41, 59, 0.95);
+        box-shadow: 0 0 12px currentColor;
+      }
+    </style>
+  </head>
+  <body class="bg-slate-900 text-white font-sans">
+    <div class="max-w-6xl mx-auto p-8">
+      <section id="home" class="mb-20 flex justify-center">
+        <div class="flex flex-col items-center">
+          <div id="speech-bubble" class="mb-3">
+            <p id="speech-text" class="text-sm text-slate-300">...</p>
+          </div>
+          <div class="flex items-center gap-10">
+            <a href="/photo-gallery.html" class="nav-bubble border-blue-500 text-blue-400"
+               data-pan="-0.5" data-tilt="0">Photo Gallery</a>
+            <div style="perspective: 700px">
+              <svg id="robot-head" width="220" height="260" viewBox="0 0 220 260" xmlns="http://www.w3.org/2000/svg">
+                <line x1="110" y1="10" x2="110" y2="36" stroke="#2a4a7a" stroke-width="3" stroke-linecap="round"/>
+                <circle cx="110" cy="8" r="7" fill="#0c1828" stroke="#3a6aaa" stroke-width="1.5"/>
+                <circle id="antenna-light" cx="110" cy="8" r="3.5" fill="#2a4a7a"/>
+                <rect x="20" y="36" width="180" height="196" rx="18" fill="#0c1828" stroke="#2a4a7a" stroke-width="1.5"/>
+                <rect x="8"   y="86" width="14" height="36" rx="4" fill="#0c1828" stroke="#2a4a7a" stroke-width="1.5"/>
+                <rect x="198" y="86" width="14" height="36" rx="4" fill="#0c1828" stroke="#2a4a7a" stroke-width="1.5"/>
+                <circle cx="78"  cy="126" r="32" fill="#060d18" stroke="#1e3860" stroke-width="1.5"/>
+                <circle cx="142" cy="126" r="32" fill="#060d18" stroke="#1e3860" stroke-width="1.5"/>
+                <g id="eye-l" class="robot-eye-group">
+                  <circle cx="78"  cy="126" r="18" fill="#1260a0"/>
+                  <circle cx="78"  cy="126" r="9"  fill="#061018"/>
+                  <circle cx="83"  cy="120" r="5"  fill="#50b0ff" opacity="0.85"/>
+                </g>
+                <g id="eye-r" class="robot-eye-group">
+                  <circle cx="142" cy="126" r="18" fill="#1260a0"/>
+                  <circle cx="142" cy="126" r="9"  fill="#061018"/>
+                  <circle cx="147" cy="120" r="5"  fill="#50b0ff" opacity="0.85"/>
+                </g>
+                <rect x="60" y="192" width="100" height="14" rx="7" fill="#060d18" stroke="#1e3860" stroke-width="1.5"/>
+                <rect id="robot-mouth" x="62" y="194" width="10" height="10" rx="5" fill="#1260a0"/>
+              </svg>
+            </div>
+            <a href="/robot.html" class="nav-bubble border-purple-500 text-purple-400"
+               data-pan="0.5" data-tilt="0">Private AI</a>
+          </div>
+          <div class="flex gap-8 mt-8">
+            <a href="/dashboard.html" class="nav-bubble border-emerald-500 text-emerald-400"
+               data-pan="-0.25" data-tilt="0.4">Plant Care</a>
+            <a href="/server-logs.html" class="nav-bubble border-cyan-500 text-cyan-400"
+               data-pan="0.25" data-tilt="0.4">System Health</a>
+          </div>
+        </div>
+      </section>
+
+    </div>
+
+    <script>
+      let config = {};
+
+      async function loadConfig() {
+        try {
+          const res = await fetch('/api/config');
+          if (res.ok) config = await res.json();
+        } catch (e) {
+          console.error('Failed to load config', e);
+        }
+      }
+
+      // ── Robot ──────────────────────────────────────────────────────────────
+      const robotHead   = document.getElementById('robot-head');
+      const eyeL        = document.getElementById('eye-l');
+      const eyeR        = document.getElementById('eye-r');
+      const robotMouth  = document.getElementById('robot-mouth');
+      const antennaLight = document.getElementById('antenna-light');
+      const speechText  = document.getElementById('speech-text');
+
+      let summaryText    = '';
+      let returnTimer    = null;
+      let navHoverActive = false;
+      const greetedAt    = {};
+
+      function setPose(pan, tilt) {
+        robotHead.style.transform = `rotateY(${pan * 60}deg) rotateX(${-tilt * 40}deg)`;
+        eyeL.style.transform = `translate(${pan * 10}px, ${tilt * 7}px)`;
+        eyeR.style.transform = `translate(${pan * 10}px, ${tilt * 7}px)`;
+      }
+
+      function setSpeech(text) {
+        speechText.textContent = text.length > 120 ? text.slice(0, 117) + '…' : text;
+      }
+
+      async function loadAiSummary() {
+        try {
+          const res = await fetch('/api/ai-summary');
+          if (!res.ok) throw new Error();
+          const data = await res.json();
+          summaryText = data.summary || '';
+        } catch {
+          summaryText = config.aiPlaceholder || 'Hi! How can I help?';
+        }
+        setSpeech(summaryText);
+      }
+
+      function onTracking(result) {
+        if (navHoverActive) return;
+        if (returnTimer) { clearTimeout(returnTimer); returnTimer = null; }
+        const faces = result.faces || [];
+        if (!faces.length) {
+          returnTimer = setTimeout(() => setPose(0, 0), 800);
+          return;
+        }
+        const f = faces[0];
+        setPose(f.pan_delta, f.tilt_delta);
+      }
+
+      function onRecognition(result) {
+        const faces = result.faces || [];
+        if (!faces.length) {
+          robotMouth.setAttribute('width', '10');
+          antennaLight.setAttribute('fill', '#2a4a6a');
+          return;
+        }
+        const f = faces[0];
+        robotMouth.setAttribute('width', Math.max(10, Math.round(f.confidence * 96)));
+        antennaLight.setAttribute('fill', f.name === 'unknown' ? '#aa7020' : '#20aa60');
+
+        const now = Date.now();
+        if (f.name !== 'unknown') {
+          const lastGreet = greetedAt[f.name] || 0;
+          if (now - lastGreet > 2 * 60 * 1000) {
+            greetedAt[f.name] = now;
+            setSpeech(`Hello, ${f.name}!`);
+            setTimeout(() => setSpeech(summaryText), 5000);
+          }
+        } else {
+          const lastGreet = greetedAt['__unknown__'] || 0;
+          if (now - lastGreet > 2 * 60 * 1000) {
+            greetedAt['__unknown__'] = now;
+            setSpeech('Hi, stranger!');
+            setTimeout(() => setSpeech(summaryText), 5000);
+          }
+        }
+      }
+
+      try {
+        const mqttUrl = location.protocol === 'https:'
+          ? `wss://${location.host}/mqtt`
+          : `ws://${location.hostname}:9001`;
+        const mqttClient = mqtt.connect(mqttUrl);
+        mqttClient.on('connect', () => {
+          mqttClient.subscribe('robot/vision/tracking');
+          mqttClient.subscribe('robot/vision/result');
+        });
+        mqttClient.on('message', (topic, payload) => {
+          try {
+            const data = JSON.parse(payload.toString());
+            if      (topic === 'robot/vision/tracking') onTracking(data);
+            else if (topic === 'robot/vision/result')   onRecognition(data);
+          } catch (e) { console.error(e); }
+        });
+      } catch (e) {
+        console.warn('MQTT unavailable:', e.message);
+      }
+
+      document.querySelectorAll('.nav-bubble').forEach(el => {
+        el.addEventListener('mouseenter', () => {
+          navHoverActive = true;
+          if (returnTimer) { clearTimeout(returnTimer); returnTimer = null; }
+          setPose(parseFloat(el.dataset.pan), parseFloat(el.dataset.tilt));
+        });
+        el.addEventListener('mouseleave', () => {
+          navHoverActive = false;
+          returnTimer = setTimeout(() => setPose(0, 0), 400);
+        });
+      });
+
+      (async () => {
+        await loadConfig();
+        loadAiSummary();
+      })();
+    </script>
+  </body>
+</html>

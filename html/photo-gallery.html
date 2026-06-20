@@ -1,0 +1,246 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" type="image/x-icon" href="/papu.ico" />
+    <link rel="apple-touch-icon" href="/papu.png" />
+    <title>Gallery | Papus Home</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      #sentinel.hidden {
+        display: none;
+      }
+    </style>
+  </head>
+  <body class="bg-slate-900 text-white font-sans">
+    <div class="max-w-7xl mx-auto p-8">
+      <nav class="mb-12">
+        <a
+          href="/"
+          class="text-blue-400 hover:text-blue-300 flex items-center space-x-2"
+        >
+          <span>←</span> <span>Back to Dashboard</span>
+        </a>
+      </nav>
+
+      <header class="mb-12">
+        <h1 class="text-4xl font-bold mb-2 text-blue-400">
+          The Family Gallery
+        </h1>
+        <p class="text-slate-400">The photo album for <i>everyone.</i></p>
+      </header>
+
+      <section
+        id="upload-section"
+        class="hidden mb-10 p-6 bg-slate-800 rounded-2xl border border-slate-700"
+      >
+        <h2
+          class="text-sm font-bold uppercase tracking-wider text-slate-500 mb-4"
+        >
+          Add a Memory
+        </h2>
+        <form
+          action="/api/admin/upload"
+          method="post"
+          enctype="multipart/form-data"
+          class="flex flex-wrap items-center gap-4"
+        >
+          <input
+            type="file"
+            name="file"
+            accept="image/*"
+            class="text-sm text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-600 file:text-white hover:file:bg-blue-500"
+          />
+          <button
+            type="submit"
+            class="bg-blue-600 px-6 py-2 rounded-full font-bold hover:bg-blue-500 transition"
+          >
+            Upload
+          </button>
+        </form>
+      </section>
+
+      <div
+        id="gallery-grid"
+        class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6"
+      ></div>
+
+      <div
+        id="sentinel"
+        class="hidden h-20 flex items-center justify-center mt-10"
+      >
+        <div
+          class="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"
+        ></div>
+      </div>
+    </div>
+
+    <script>
+      let config = {};
+
+      async function loadConfig() {
+        try {
+          const res = await fetch('/api/config');
+          if (res.ok) config = await res.json();
+        } catch (e) {
+          console.error('Failed to load config', e);
+        }
+      }
+
+      // 1. AUTHORIZATION CHECK
+      // Note: Cloudflare sends headers, but we can't read them easily via client-side JS
+      // without an API call. For now, we'll fetch a "WhoAmI" check from your Node server.
+      async function checkAuth() {
+        try {
+          const res = await fetch('/api/admin-status');
+          if (!res.ok) return;
+          const data = await res.json();
+
+          if (data.isAdmin) {
+            document
+              .getElementById('upload-section')
+              .classList.remove('hidden');
+          }
+        } catch (e) {
+          console.log('Auth check failed, defaulting to read-only.');
+        }
+      }
+
+      // 2. IMAGE LOADING LOGIC
+      let images = [];
+      const grid = document.getElementById('gallery-grid');
+      const sentinel = document.getElementById('sentinel');
+
+      async function fetchImageList() {
+        // We'll tell the Node server to give us the file list
+        const res = await fetch('/api/list-images');
+        images = await res.json();
+        if (images.length > 0) {
+          loadBatch();
+          // Show spinner only if there's enough content to actually scroll
+          if (images.length > 8) sentinel.classList.remove('hidden');
+        }
+      }
+
+      function createReactionOverlay(filename) {
+        const overlay = document.createElement('div');
+        overlay.className = 'reaction-overlay absolute bottom-2 right-2 flex items-center gap-2 p-1 bg-black/60 rounded-xl text-sm';
+
+        const countsContainer = document.createElement('div');
+        countsContainer.className = 'counts flex items-center gap-1';
+        overlay.appendChild(countsContainer);
+
+        const picker = document.createElement('div');
+        picker.className = 'reaction-picker hidden absolute bottom-10 right-0 bg-slate-800 p-2 rounded-xl flex gap-2 border border-slate-600';
+        (config.reactions || ['🥹', '😂', '🥰', '❤️']).forEach((r) => {
+          const btn = document.createElement('button');
+          btn.className = 'p-1 text-lg';
+          btn.textContent = r;
+          btn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            await sendReaction(filename, r);
+            picker.classList.add('hidden');
+            await refreshReactions(filename, countsContainer, overlay);
+          });
+          picker.appendChild(btn);
+        });
+        overlay.appendChild(picker);
+
+        // long-press handling
+        let pressTimer = null;
+        overlay.addEventListener('mousedown', (e) => {
+          pressTimer = setTimeout(() => {
+            picker.classList.remove('hidden');
+          }, 450);
+        });
+        overlay.addEventListener('mouseup', (e) => {
+          if (pressTimer) clearTimeout(pressTimer);
+        });
+        overlay.addEventListener('mouseleave', (e) => {
+          if (pressTimer) clearTimeout(pressTimer);
+        });
+
+        // quick click defaults to first configured reaction
+        overlay.addEventListener('click', async (e) => {
+          if (pressTimer) clearTimeout(pressTimer);
+          await sendReaction(filename, (config.reactions && config.reactions[0]) || '❤️');
+          await refreshReactions(filename, countsContainer, overlay);
+        });
+
+        return { overlay, countsContainer, picker };
+      }
+
+      async function refreshReactions(filename, countsContainer, overlay) {
+        try {
+          const res = await fetch('/api/photo-reactions?file=' + encodeURIComponent(filename));
+          const data = await res.json();
+          countsContainer.innerHTML = '';
+          const details = data.details || {};
+          const counts = data.counts || {};
+          // Build tooltip content: each reaction then users
+          let tooltipLines = [];
+          Object.keys(counts).forEach((r) => {
+            const cnt = counts[r] || 0;
+            const span = document.createElement('span');
+            span.className = 'flex items-center gap-1 px-2 py-0.5 bg-black/40 rounded-full';
+            span.textContent = `${r} ${cnt}`;
+            countsContainer.appendChild(span);
+
+            const users = details[r] || [];
+            users.forEach((u) => tooltipLines.push(`${r}  ${u}`));
+          });
+          overlay.title = tooltipLines.join('\n') || 'Be the first to react';
+        } catch (e) {
+          console.log('Failed to load reactions for', filename, e);
+        }
+      }
+
+      async function sendReaction(filename, reaction) {
+        try {
+          const res = await fetch('/api/photo-reactions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ file: filename, reaction }),
+          });
+          if (res.status === 401) {
+            alert('Please sign in to react to photos.');
+            return;
+          }
+        } catch (e) {
+          console.error('Failed to send reaction', e);
+        }
+      }
+
+      function loadBatch() {
+        images.forEach((src) => {
+          const div = document.createElement('div');
+          div.className =
+            'relative aspect-[4/5] bg-slate-800 rounded-2xl overflow-hidden border border-slate-700 shadow-lg transition transform hover:-translate-y-1 hover:border-blue-500';
+
+          const img = document.createElement('img');
+          img.src = `${config.mediaPathPrefix || '/private/family'}/${src}`;
+          img.className = 'w-full h-full object-cover';
+          img.loading = 'lazy';
+          div.appendChild(img);
+
+          const { overlay, countsContainer } = createReactionOverlay(src);
+          div.appendChild(overlay);
+
+          // After DOM insertion, populate reactions
+          grid.appendChild(div);
+          refreshReactions(src, countsContainer, overlay);
+        });
+        // Hide spinner once everything is loaded
+        sentinel.classList.add('hidden');
+      }
+
+      // Run on startup
+      (async () => {
+        await loadConfig();
+        checkAuth();
+        fetchImageList();
+      })();
+    </script>
+  </body>
+</html>

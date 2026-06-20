@@ -1,0 +1,36 @@
+1780433841: mosquitto version 2.1.2 starting
+1780433841: Config loaded from /mosquitto/config/mosquitto.conf.
+1780433841: Bridge support available.
+1780433841: Persistence support available.
+1780433841: TLS support available.
+1780433841: TLS-PSK support available.
+1780433841: Websockets support available.
+1780433841: Opening ipv4 listen socket on port 1883.
+1780433841: Opening ipv4 listen socket on port 9001.
+1780433841: mosquitto version 2.1.2 running
+1780433842: New connection from 172.18.0.3:33031 on port 1883.
+1780433842: New client connected from 172.18.0.3:33031 as robot-vision-worker (p4, c1, k60).
+1780433887: New connection from 192.168.65.1:25082 on port 1883.
+1780433887: New client connected from 192.168.65.1:25082 as robot-vision-publisher (p4, c1, k60).
+1780433887: Client robot-vision-publisher [192.168.65.1:25082] disconnected: connection closed by client.
+1780433894: New connection from 192.168.65.1:18719 on port 1883.
+1780433894: New client connected from 192.168.65.1:18719 as robot-vision-publisher (p4, c1, k60).
+1780433894: Client robot-vision-publisher [192.168.65.1:18719] disconnected: connection closed by client.
+1780437317: Saving in-memory database to /mosquitto/data//mosquitto.db.
+1780449588: Saving in-memory database to /mosquitto/data//mosquitto.db.
+1780460025: Saving in-memory database to /mosquitto/data//mosquitto.db.
+1780492190: Saving in-memory database to /mosquitto/data//mosquitto.db.
+1780501403: Saving in-memory database to /mosquitto/data//mosquitto.db.
+1780503183: New connection from 192.168.65.1:19762 on port 1883.
+1780503183: New client connected from 192.168.65.1:19762 as robot-vision-publisher (p4, c1, k60).
+1780503291: Outgoing messages are being dropped for client robot-vision-worker.
+1780503297: Client robot-vision-worker [172.18.0.3:33031] disconnected: connection closed by client.
+1780503298: New connection from 172.18.0.3:52771 on port 1883.
+1780503298: New client connected from 172.18.0.3:52771 as robot-vision-worker (p4, c1, k60).
+1780503335: New connection from 192.168.65.1:25555 on port 1883.
+1780503335: New client connected from 192.168.65.1:25555 as robot-vision-enroll (p4, c1, k10).
+1780503335: Client robot-vision-enroll [192.168.65.1:25555] disconnected: No error information.
+1780503404: Outgoing messages are being dropped for client robot-vision-worker.
+1780503428: Client robot-vision-worker [172.18.0.3:52771] disconnected: connection closed by client.
+1780503429: New connection from 172.18.0.3:39715 on port 1883.
+1780503429: New client connected from 172.18.0.3:39715 as robot-vision-worker (p4, c1, k60).

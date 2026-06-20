@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" type="image/x-icon" href="/papu.ico" />
+    <title>System Health | Papu Home</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+  </head>
+  <body class="bg-slate-900 text-white font-sans min-h-screen">
+    <div class="max-w-6xl mx-auto p-8">
+      <div class="flex items-center justify-between mb-8">
+        <div>
+          <a href="index.html" class="text-slate-400 hover:text-blue-400 text-sm transition">← Back to Home</a>
+          <h1 class="text-3xl font-extrabold mt-1 bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 to-blue-400">
+            System Health
+          </h1>
+        </div>
+        <button
+          onclick="loadLogs()"
+          class="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-xl text-sm font-medium transition"
+        >
+          Refresh
+        </button>
+      </div>
+
+      <!-- System stats widget -->
+      <div class="bg-slate-800/50 p-6 rounded-2xl border border-slate-700 flex flex-col space-y-6 mb-6">
+        <div>
+          <div class="flex justify-between items-end mb-2">
+            <div>
+              <span class="text-xs text-slate-400 block mb-1">CPU Load</span>
+              <span id="cpu-load" class="text-2xl font-mono text-blue-400 leading-none">--%</span>
+            </div>
+            <div class="text-right">
+              <span class="text-[10px] uppercase text-slate-500 font-bold block">Server Temp</span>
+              <span id="cpu-temp" class="text-sm font-mono text-emerald-400 bg-emerald-900/30 px-2 py-0.5 rounded">--°C</span>
+            </div>
+          </div>
+          <div class="w-full bg-slate-900 rounded-full h-2 overflow-hidden">
+            <div id="cpu-bar" class="bg-blue-500 h-full transition-all duration-500" style="width: 0%"></div>
+          </div>
+        </div>
+        <div>
+          <div class="flex justify-between items-end mb-2">
+            <span class="text-xs text-slate-400">Memory Usage</span>
+            <span id="mem-load" class="text-xl font-mono text-purple-400">--%</span>
+          </div>
+          <div class="w-full bg-slate-900 rounded-full h-2 overflow-hidden">
+            <div id="mem-bar" class="bg-purple-500 h-full transition-all duration-500" style="width: 0%"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Filters -->
+      <div class="bg-slate-800/50 border border-slate-700 rounded-2xl p-5 mb-6 flex flex-wrap gap-4 items-end">
+        <div class="flex flex-col gap-1">
+          <label class="text-xs uppercase tracking-widest text-slate-500 font-bold">Log Type</label>
+          <select id="filter-type" onchange="loadLogs()" class="bg-slate-900 border border-slate-700 text-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-cyan-500">
+            <option value="">All Types</option>
+            <option value="app">App</option>
+            <option value="api">API</option>
+            <option value="db">DB</option>
+            <option value="device">Hardware</option>
+          </select>
+        </div>
+        <div class="flex flex-col gap-1">
+          <label class="text-xs uppercase tracking-widest text-slate-500 font-bold">Level</label>
+          <select id="filter-level" onchange="loadLogs()" class="bg-slate-900 border border-slate-700 text-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-cyan-500">
+            <option value="">All Levels</option>
+            <option value="info">Info</option>
+            <option value="warn">Warn</option>
+            <option value="error">Error</option>
+          </select>
+        </div>
+        <div class="ml-auto text-xs text-slate-500" id="log-count"></div>
+      </div>
+
+      <!-- Log Table -->
+      <div class="bg-slate-800/50 border border-slate-700 rounded-2xl overflow-hidden">
+        <div id="log-loading" class="p-10 text-center text-slate-500 text-sm">Loading...</div>
+        <table id="log-table" class="hidden w-full text-sm">
+          <thead>
+            <tr class="border-b border-slate-700 text-left text-[10px] uppercase tracking-widest text-slate-500">
+              <th class="px-5 py-3">Time</th>
+              <th class="px-5 py-3">Type</th>
+              <th class="px-5 py-3">Level</th>
+              <th class="px-5 py-3">Source</th>
+              <th class="px-5 py-3">Message</th>
+            </tr>
+          </thead>
+          <tbody id="log-body"></tbody>
+        </table>
+        <div id="log-empty" class="hidden p-10 text-center text-slate-500 text-sm">No logs found.</div>
+      </div>
+
+      <!-- Pagination -->
+      <div class="flex justify-between items-center mt-4">
+        <button
+          id="btn-prev"
+          onclick="changePage(-1)"
+          disabled
+          class="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-xl text-sm font-medium transition disabled:opacity-30 disabled:cursor-not-allowed"
+        >
+          ← Prev
+        </button>
+        <span id="page-label" class="text-slate-500 text-xs">Page 1</span>
+        <button
+          id="btn-next"
+          onclick="changePage(1)"
+          disabled
+          class="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-xl text-sm font-medium transition disabled:opacity-30 disabled:cursor-not-allowed"
+        >
+          Next →
+        </button>
+      </div>
+    </div>
+
+    <script>
+      const PAGE_SIZE = 50;
+      let currentPage = 0;
+      let lastCount = 0;
+
+      const typeBadge = {
+        app:    'bg-emerald-900/60 text-emerald-300 border border-emerald-700',
+        api:    'bg-indigo-900/60 text-indigo-300 border border-indigo-700',
+        db:     'bg-orange-900/60 text-orange-300 border border-orange-700',
+        device: 'bg-cyan-900/60 text-cyan-300 border border-cyan-700',
+      };
+
+      const levelBadge = {
+        info:  'bg-blue-900/60 text-blue-300 border border-blue-700',
+        warn:  'bg-yellow-900/60 text-yellow-300 border border-yellow-700',
+        error: 'bg-red-900/60 text-red-300 border border-red-700',
+      };
+
+      const typeLabel = { app: 'App', api: 'API', db: 'DB', device: 'Hardware' };
+
+      async function loadLogs() {
+        currentPage = 0;
+        await fetchLogs();
+      }
+
+      async function changePage(delta) {
+        currentPage = Math.max(0, currentPage + delta);
+        await fetchLogs();
+      }
+
+      async function fetchLogs() {
+        const log_type = document.getElementById('filter-type').value;
+        const log_level = document.getElementById('filter-level').value;
+
+        document.getElementById('log-loading').classList.remove('hidden');
+        document.getElementById('log-table').classList.add('hidden');
+        document.getElementById('log-empty').classList.add('hidden');
+
+        const params = new URLSearchParams({ page: currentPage, rows: PAGE_SIZE });
+        if (log_type) params.set('log_type', log_type);
+        if (log_level) params.set('log_level', log_level);
+
+        try {
+          const res = await fetch('/api/system-logs?' + params.toString());
+          const logs = await res.json();
+          lastCount = logs.length;
+          renderLogs(logs);
+        } catch (e) {
+          console.error('Failed to load logs', e);
+          document.getElementById('log-loading').textContent = 'Failed to load logs.';
+        }
+      }
+
+      function renderLogs(logs) {
+        document.getElementById('log-loading').classList.add('hidden');
+
+        if (logs.length === 0) {
+          document.getElementById('log-empty').classList.remove('hidden');
+          document.getElementById('log-count').textContent = '';
+          updatePagination();
+          return;
+        }
+
+        const tbody = document.getElementById('log-body');
+        tbody.innerHTML = '';
+
+        logs.forEach(log => {
+          const tr = document.createElement('tr');
+          tr.className = 'border-b border-slate-700/50 hover:bg-slate-700/30 transition';
+
+          const ts = new Date(log.timestamp);
+          const timeStr = ts.toLocaleDateString() + ' ' + ts.toLocaleTimeString();
+          const tBadge = typeBadge[log.log_type] || 'bg-slate-700 text-slate-300';
+          const lBadge = levelBadge[log.log_level] || 'bg-slate-700 text-slate-300';
+          const tLabel = typeLabel[log.log_type] || log.log_type;
+
+          tr.innerHTML = `
+            <td class="px-5 py-3 text-slate-400 whitespace-nowrap font-mono text-xs">${timeStr}</td>
+            <td class="px-5 py-3 whitespace-nowrap">
+              <span class="px-2 py-0.5 rounded-full text-xs font-bold ${tBadge}">${escHtml(tLabel)}</span>
+            </td>
+            <td class="px-5 py-3 whitespace-nowrap">
+              <span class="px-2 py-0.5 rounded-full text-xs font-bold ${lBadge}">${escHtml(log.log_level)}</span>
+            </td>
+            <td class="px-5 py-3 text-slate-400 whitespace-nowrap text-xs font-mono">${escHtml(log.source ?? '—')}</td>
+            <td class="px-5 py-3 text-slate-300">${escHtml(log.message)}</td>
+          `;
+          tbody.appendChild(tr);
+        });
+
+        document.getElementById('log-table').classList.remove('hidden');
+        document.getElementById('log-count').textContent = `${logs.length} entries`;
+        updatePagination();
+      }
+
+      function updatePagination() {
+        document.getElementById('page-label').textContent = `Page ${currentPage + 1}`;
+        document.getElementById('btn-prev').disabled = currentPage === 0;
+        document.getElementById('btn-next').disabled = lastCount < PAGE_SIZE;
+      }
+
+      function escHtml(str) {
+        return String(str ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+      }
+
+      async function updateStats() {
+        try {
+          const res = await fetch('/api/stats');
+          const data = await res.json();
+          document.getElementById('cpu-load').innerText = data.cpu + '%';
+          document.getElementById('mem-load').innerText = data.mem + '%';
+          document.getElementById('cpu-temp').innerText = data.temp + '°C';
+          document.getElementById('cpu-bar').style.width = data.cpu + '%';
+          document.getElementById('mem-bar').style.width = data.mem + '%';
+        } catch (e) {
+          console.error('Stats update failed', e);
+        }
+      }
+
+      loadLogs();
+      updateStats();
+      setInterval(updateStats, 3000);
+    </script>
+  </body>
+</html>

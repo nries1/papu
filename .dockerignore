@@ -1,0 +1,6 @@
+.git
+node_modules
+apps/hardware/dist
+postgres_data
+data/
+*.log
