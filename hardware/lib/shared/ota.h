@@ -2,6 +2,7 @@
 #define OTA_H
 
 #include <ArduinoOTA.h>
+#include <TelnetStream.h>
 
 namespace OTAService {
 
@@ -22,7 +23,11 @@ inline void begin(const char* hostname) {
   });
 
   ArduinoOTA.begin();
+
+  TelnetStream.begin();
+
   Serial.printf("[OTA] Ready — %s.local\n", hostname);
+  Serial.println("[Telnet] Listening on port 23");
 }
 
 inline void handle() {

@@ -7,6 +7,7 @@
 #include <time.h>
 
 #include "config.h"
+#include "logger.h"
 #include "ota.h"
 
 // Seengreat Adapter Board E — V2.x pin mapping (ESP32-S3 DevKitC-1 form factor)
@@ -74,6 +75,7 @@ struct HomeStats {
   bool           valid;
 };
 
+Logger log{"DISPLAY"};
 MatrixPanel_I2S_DMA* display = nullptr;
 HomeStats stats = {};
 int           currentPage   = 0;
@@ -287,7 +289,7 @@ void setup() {
   HUB75_I2S_CFG mxconfig(PANEL_W, PANEL_H, 1, pins);
   display = new MatrixPanel_I2S_DMA(mxconfig);
   if (!display->begin()) {
-    Serial.println("Matrix init FAILED");
+    log.error("Matrix init failed");
     while (true) delay(1000);
   }
   display->setTextWrap(false);

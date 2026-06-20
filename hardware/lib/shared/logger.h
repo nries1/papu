@@ -2,6 +2,7 @@
 #define LOGGER_H
 
 #include <Arduino.h>
+#include <TelnetStream.h>
 
 enum LogLevel { LOG_DEBUG, LOG_INFO, LOG_WARN, LOG_ERROR };
 
@@ -44,7 +45,10 @@ class Logger {
     vsnprintf(msg, sizeof(msg), fmt, args);
     va_end(args);
 
-    Serial.printf("[%7.3fs] [%s /%-7s] %s\n", elapsed, levelStr, _tag, msg);
+    char line[320];
+    snprintf(line, sizeof(line), "[%7.3fs] [%s /%-7s] %s\n", elapsed, levelStr, _tag, msg);
+    Serial.print(line);
+    TelnetStream.print(line);
   }
 
   void debug(const char* fmt, ...) const {
