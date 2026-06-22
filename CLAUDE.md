@@ -122,6 +122,15 @@ http://localhost:80
 
 ---
 
+## Server Prerequisites
+
+- **`avahi-daemon`** — required for OTA serial monitoring (`npm run hw:monitor -- --transport ota --name <device>`). ESP32 boards advertise themselves via mDNS; avahi resolves `<device>.local` on Ubuntu/Linux.
+  ```bash
+  sudo apt install avahi-daemon
+  ```
+
+---
+
 ## Hardware (Arduino/ESP32)
 
 Sketches in `hardware/`:
