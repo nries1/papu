@@ -28,6 +28,7 @@ interface DevicesTable {
   friendly_name: string | null;
   device_type: string | null;
   has_ota: boolean;
+  config: ColumnType<Record<string, unknown>, string | undefined, string>;
 }
 
 interface RoomsTable {

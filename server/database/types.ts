@@ -27,11 +27,16 @@ export interface WaterEventWithRoom {
   room_name: string | null;
 }
 
+export interface DeviceConfig {
+  tank_capacity_gallons?: number;
+}
+
 export interface Device {
   device_id: string;
   room_id: number | null;
   friendly_name: string | null;
   device_type: string | null;
+  config: DeviceConfig;
 }
 
 export interface RoomWithDevices {
@@ -93,6 +98,7 @@ export interface DeviceWithStatus {
   last_seen: Date | null;
   healthy: boolean;
   ota_available: boolean;
+  config: DeviceConfig;
   latest_env_readings: Record<string, number> | null;
   latest_env_timestamp: Date | null;
   latest_tank_reading: { gallons: number; pct_full: number; timestamp: Date } | null;

@@ -92,3 +92,13 @@
 1782163164: Saving in-memory database to /mosquitto/data//mosquitto.db.
 1782164802: New connection from 192.168.1.153:63620 on port 1883.
 1782164802: New client connected from 192.168.1.153:63620 as C1E590 (p4, c1, k15).
+1782164965: Saving in-memory database to /mosquitto/data//mosquitto.db.
+1782166766: Saving in-memory database to /mosquitto/data//mosquitto.db.
+1782168567: Saving in-memory database to /mosquitto/data//mosquitto.db.
+1782169934: Client mqttjs_21fc4fba [172.20.0.3:60468] disconnected: connection closed by client.
+1782169935: New connection from 172.20.0.3:51126 on port 1883.
+1782169935: New client connected from 172.20.0.3:51126 as mqttjs_67d20337 (p4, c1, k60).
+1782170368: Saving in-memory database to /mosquitto/data//mosquitto.db.
+1782170370: Client mqttjs_67d20337 [172.20.0.3:51126] disconnected: connection closed by client.
+1782170371: New connection from 172.20.0.3:45148 on port 1883.
+1782170371: New client connected from 172.20.0.3:45148 as mqttjs_3d55baac (p4, c1, k60).

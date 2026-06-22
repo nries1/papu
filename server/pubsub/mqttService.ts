@@ -10,6 +10,7 @@ import {
   getRoomIdForDevice,
   appendDeviceLog,
   upsertDevicePresence,
+  getDeviceConfig,
 } from '../database/dao';
 
 interface WaterCommandPayload {
@@ -88,17 +89,23 @@ client.on('message', async (topic: string, message: Buffer) => {
   if (topic === SHARED.water_level_topic) {
     await appLog({ message: 'MQTT water_level payload received', details: { topic, data }, source: 'mqttService', level: 'info' });
 
+    const deviceId = data['device_id'] as string;
+    const percentFull = data['percent_full'] as number;
+    const config = await getDeviceConfig(deviceId);
+    const tankCapacity = config.tank_capacity_gallons ?? 30;
+    const gallons = (percentFull / 100) * tankCapacity;
+
     const appendRes = await appendWaterLevel({
-      device_id: data['device_id'] as string,
-      gallons: data['tank_gallons'] as number,
+      device_id: deviceId,
+      gallons,
       raw_value: data['raw_value'] as number,
-      percent_full: data['percent_full'] as number,
+      percent_full: percentFull,
     });
 
     if (!appendRes.success) {
-      await appLog({ message: 'Failed to persist tank reading', details: { device_id: data['device_id'], debugId: appendRes.dbError?.debugId }, source: 'mqttService', level: 'error' });
+      await appLog({ message: 'Failed to persist tank reading', details: { device_id: deviceId, debugId: appendRes.dbError?.debugId }, source: 'mqttService', level: 'error' });
     } else {
-      await appLog({ message: `Tank level updated for ${data['device_id']}`, details: { gallons: data['tank_gallons'], pct_full: data['percent_full'] }, source: 'mqttService', level: 'info' });
+      await appLog({ message: `Tank level updated for ${deviceId}`, details: { gallons, pct_full: percentFull, tank_capacity: tankCapacity }, source: 'mqttService', level: 'info' });
     }
   }
 
@@ -184,7 +191,7 @@ async function canWaterPlants(device_id: string): Promise<boolean> {
     return false;
   }
   const latestLevel = lastWaterLevelData[0].pct_full;
-  return latestLevel > 4; // 3 gallons is ~10% of 30 gallon tank
+  return latestLevel > 4; // percentage-based; tank-size-agnostic
 }
 
 export async function publishWaterCommand(payload: WaterCommandPayload): Promise<boolean> {

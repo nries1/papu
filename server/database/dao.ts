@@ -8,6 +8,7 @@ import type {
   TankReadingWithRoom,
   WaterEventWithRoom,
   Device,
+  DeviceConfig,
   RoomWithDevices,
   EnvironmentReading,
   AiSummary,
@@ -688,6 +689,7 @@ export async function getDevicesWithStatus(): Promise<{
         d.device_id,
         d.friendly_name,
         d.device_type,
+        d.config,
         r.name        AS room_name,
         r.display_name AS room_display_name,
         dp.ip_address,
@@ -722,10 +724,17 @@ export async function getDevicesWithStatus(): Promise<{
         (SELECT MAX(er.timestamp) FROM environment_readings er WHERE er.device_id = d.device_id) AS latest_env_timestamp,
         (
           SELECT row_to_json(t) FROM (
-            SELECT gallons, pct_full, timestamp
-            FROM tank_readings
-            WHERE device_id = d.device_id
-            ORDER BY timestamp DESC LIMIT 1
+            SELECT
+              ROUND(
+                (tr.pct_full / 100.0) *
+                COALESCE((d.config->>'tank_capacity_gallons')::numeric, 30),
+                1
+              ) AS gallons,
+              tr.pct_full,
+              tr.timestamp
+            FROM tank_readings tr
+            WHERE tr.device_id = d.device_id
+            ORDER BY tr.timestamp DESC LIMIT 1
           ) t
         ) AS latest_tank_reading,
         (
@@ -768,6 +777,33 @@ export async function createDevice({
       .insertInto('devices')
       .values({ device_id, friendly_name, device_type, room_id: room?.id ?? null, has_ota })
       .execute();
+  });
+}
+
+// ── Device config ─────────────────────────────────────────────────────────────
+
+export async function getDeviceConfig(device_id: string): Promise<DeviceConfig> {
+  try {
+    const row = await db
+      .selectFrom('devices')
+      .select('config')
+      .where('device_id', '=', device_id)
+      .executeTakeFirst();
+    return (row?.config as DeviceConfig) ?? {};
+  } catch {
+    return {};
+  }
+}
+
+export async function updateDeviceConfig(
+  device_id: string,
+  patch: DeviceConfig
+): Promise<{ success: boolean; dbError?: DbError }> {
+  return tryMutate('updateDeviceConfig', async () => {
+    await sql`
+      UPDATE devices SET config = config || ${JSON.stringify(patch)}::jsonb
+      WHERE device_id = ${device_id}
+    `.execute(db);
   });
 }
 

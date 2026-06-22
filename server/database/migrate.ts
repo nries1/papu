@@ -1,12 +1,14 @@
 import { db } from './db';
 import { up as up001 } from './migrations/001_initial';
 import { up as up002 } from './migrations/002_users';
+import { up as up003 } from './migrations/003_device_config';
 
 async function main() {
   console.log('Running migrations...');
   try {
     await up001(db);
     await up002(db);
+    await up003(db);
     console.log('Migrations complete.');
   } catch (err) {
     console.error('Migration failed:', err);

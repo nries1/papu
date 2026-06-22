@@ -207,6 +207,30 @@
         padding: 60px 20px;
         font-size: 0.95rem;
       }
+
+      .tank-capacity-row {
+        margin-top: 10px;
+        padding-top: 10px;
+        border-top: 1px solid #1e293b;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 0.8rem;
+        color: var(--text-dim);
+      }
+
+      .edit-capacity-btn {
+        background: none;
+        border: none;
+        color: var(--accent-blue);
+        cursor: pointer;
+        font-size: 0.75rem;
+        padding: 2px 6px;
+        border-radius: 4px;
+        opacity: 0.7;
+        transition: opacity 0.15s;
+      }
+      .edit-capacity-btn:hover { opacity: 1; }
     </style>
   </head>
   <body>
@@ -260,6 +284,22 @@
       </div>
     </div>
 
+    <!-- Device Config Modal -->
+    <div class="modal-overlay" id="config-modal-overlay">
+      <div class="modal">
+        <h2>Device Settings</h2>
+        <div class="form-group">
+          <label>Tank Capacity (gallons)</label>
+          <input type="number" id="cfg-tank-capacity" min="1" max="10000" step="0.5" placeholder="30" />
+        </div>
+        <div id="config-error-msg" style="color:var(--accent-red);font-size:0.8rem;margin-top:8px;display:none;"></div>
+        <div class="form-actions">
+          <button class="btn-cancel" id="close-config-modal">Cancel</button>
+          <button class="btn-save" id="save-config">Save</button>
+        </div>
+      </div>
+    </div>
+
     <script>
       const grid = document.getElementById('devices-grid');
       let roomsCache = [];
@@ -298,15 +338,21 @@
       function renderPumpReadings(d) {
         const tank = d.latest_tank_reading;
         const pump = d.latest_pump_event;
-        if (!tank && !pump) return '';
+        const tankCapacity = d.config?.tank_capacity_gallons ?? 30;
+        if (!tank && !pump) return `
+          <div class="tank-capacity-row">
+            <span>Tank size: <strong style="color:var(--text-main);">${tankCapacity} gal</strong></span>
+            <button class="edit-capacity-btn" onclick="openConfigModal('${d.device_id}', ${tankCapacity})">Edit</button>
+          </div>`;
         let html = '<div style="margin-top:12px;padding-top:12px;border-top:1px solid #1e293b;display:grid;grid-template-columns:1fr 1fr;gap:10px 16px;">';
         if (tank) {
           const pct = Math.round(tank.pct_full);
+          const gallons = ((tank.pct_full / 100) * tankCapacity).toFixed(1);
           const barColor = pct > 30 ? '#4ade80' : pct > 10 ? '#fbbf24' : '#f87171';
           html += `
             <div>
               <div style="font-size:0.68rem;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-dim);margin-bottom:4px;">Water Level</div>
-              <div style="font-size:0.9rem;">${Number(tank.gallons).toFixed(1)} gal <span style="color:var(--text-dim);">(${pct}%)</span></div>
+              <div style="font-size:0.9rem;">${gallons} gal <span style="color:var(--text-dim);">(${pct}%)</span></div>
               <div style="margin-top:4px;height:4px;background:#1e293b;border-radius:2px;">
                 <div style="height:4px;border-radius:2px;background:${barColor};width:${Math.min(pct,100)}%;"></div>
               </div>
@@ -323,6 +369,11 @@
             </div>`;
         }
         html += '</div>';
+        html += `
+          <div class="tank-capacity-row">
+            <span>Tank size: <strong style="color:var(--text-main);">${tankCapacity} gal</strong></span>
+            <button class="edit-capacity-btn" onclick="openConfigModal('${d.device_id}', ${tankCapacity})">Edit</button>
+          </div>`;
         return html;
       }
 
@@ -470,6 +521,54 @@
           loadDevices();
         } catch (e) {
           errEl.textContent = 'Network error — could not save device.';
+          errEl.style.display = 'block';
+        }
+      });
+
+      // Config modal
+      let configDeviceId = null;
+      const configOverlay = document.getElementById('config-modal-overlay');
+
+      function openConfigModal(device_id, currentCapacity) {
+        configDeviceId = device_id;
+        document.getElementById('cfg-tank-capacity').value = currentCapacity;
+        document.getElementById('config-error-msg').style.display = 'none';
+        configOverlay.classList.add('open');
+      }
+
+      document.getElementById('close-config-modal').addEventListener('click', () => {
+        configOverlay.classList.remove('open');
+      });
+
+      configOverlay.addEventListener('click', (e) => {
+        if (e.target === configOverlay) configOverlay.classList.remove('open');
+      });
+
+      document.getElementById('save-config').addEventListener('click', async () => {
+        const errEl = document.getElementById('config-error-msg');
+        errEl.style.display = 'none';
+        const v = parseFloat(document.getElementById('cfg-tank-capacity').value);
+        if (!v || v <= 0) {
+          errEl.textContent = 'Enter a valid tank capacity.';
+          errEl.style.display = 'block';
+          return;
+        }
+        try {
+          const resp = await fetch(`/api/admin/devices/${configDeviceId}/config`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ tank_capacity_gallons: v }),
+          });
+          const result = await resp.json();
+          if (!resp.ok) {
+            errEl.textContent = result.error ?? 'Failed to save.';
+            errEl.style.display = 'block';
+            return;
+          }
+          configOverlay.classList.remove('open');
+          loadDevices();
+        } catch (e) {
+          errEl.textContent = 'Network error — could not save.';
           errEl.style.display = 'block';
         }
       });

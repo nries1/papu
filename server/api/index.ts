@@ -31,6 +31,8 @@ import {
   getAllDisplayNames,
   getDevicesWithStatus,
   createDevice,
+  getDeviceConfig,
+  updateDeviceConfig,
 } from '../database/dao';
 
 const app = express();
@@ -266,8 +268,10 @@ app.get('/api/can-water', async (req, res) => {
     if (success && waterLevels.length > 0) {
       const gallons = waterLevels[0].gallons || 0;
       if (gallons < 3) {
+        const deviceConfig = device_id ? await getDeviceConfig(device_id) : {};
+        const tankCapacity = deviceConfig.tank_capacity_gallons ?? 30;
         disabledReasons.push(
-          `Water level too low (${gallons.toFixed(1)}/30 gal)`
+          `Water level too low (${gallons.toFixed(1)}/${tankCapacity} gal)`
         );
       }
     }
@@ -358,6 +362,30 @@ app.post('/api/admin/devices', async (req, res) => {
     return res.status(400).json({ error: dbError!.name, debugId: dbError!.debugId });
   }
   return res.status(201).json({ success: true });
+});
+
+app.patch('/api/admin/devices/:id/config', async (req, res) => {
+  const device_id = req.params.id;
+  const body = req.body as Record<string, unknown>;
+
+  const patch: Record<string, unknown> = {};
+  if ('tank_capacity_gallons' in body) {
+    const v = body['tank_capacity_gallons'];
+    if (typeof v !== 'number' || v <= 0 || v > 10000) {
+      return res.status(400).json({ error: 'tank_capacity_gallons must be a positive number ≤ 10000' });
+    }
+    patch['tank_capacity_gallons'] = v;
+  }
+
+  if (Object.keys(patch).length === 0) {
+    return res.status(400).json({ error: 'No valid config keys provided' });
+  }
+
+  const { success, dbError } = await updateDeviceConfig(device_id, patch);
+  if (!success) {
+    return res.status(400).json({ error: dbError!.name, debugId: dbError!.debugId });
+  }
+  return res.status(200).json({ success: true });
 });
 
 app.get('/api/rooms', async (req, res) => {
