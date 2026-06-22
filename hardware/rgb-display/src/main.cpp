@@ -75,7 +75,7 @@ struct HomeStats {
   bool           valid;
 };
 
-Logger log{"DISPLAY"};
+Logger logger{"DISPLAY"};
 MatrixPanel_I2S_DMA* display = nullptr;
 HomeStats stats = {};
 int           currentPage   = 0;
@@ -238,7 +238,7 @@ void fetchStats() {
   String body = http.getString();
   http.end();
 
-  DynamicJsonDocument doc(1024);
+  JsonDocument doc;
   if (deserializeJson(doc, body) != DeserializationError::Ok) return;
 
   stats.outdoor_temp_f = doc["outdoor"]["temp_f"] | 0.0f;
@@ -289,7 +289,7 @@ void setup() {
   HUB75_I2S_CFG mxconfig(PANEL_W, PANEL_H, 1, pins);
   display = new MatrixPanel_I2S_DMA(mxconfig);
   if (!display->begin()) {
-    log.error("Matrix init failed");
+    logger.error("Matrix init failed");
     while (true) delay(1000);
   }
   display->setTextWrap(false);

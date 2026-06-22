@@ -24,7 +24,7 @@ Adafruit_BME680 bme;
 WiFiClient espClient;
 PubSubClient mqttClient(espClient);
 Device device;
-Logger log{"ENV"};
+Logger logger{"ENV"};
 
 String clientId = Device::getDeviceID();
 unsigned long lastMsgTime = 0;
@@ -53,7 +53,7 @@ float computeIAQ(float gasKohm, float humidity) {
 
 void publishLog(const char* level, const char* message) {
   if (!mqttClient.connected()) return;
-  StaticJsonDocument<256> doc;
+  JsonDocument doc;
   char out[320];
   doc["device_id"] = Device::getDeviceID();
   doc["device_name"] = Device::getDeviceName();
@@ -65,21 +65,21 @@ void publishLog(const char* level, const char* message) {
 
 void setupWiFi() {
   delay(10);
-  log.info("Connecting to Wi-Fi: %s", WIFI_SSID);
+  logger.info("Connecting to Wi-Fi: %s", WIFI_SSID);
   WiFi.begin(WIFI_SSID, WIFI_PASS);
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
   }
-  log.info("Wi-Fi connected, IP: %s", WiFi.localIP().toString().c_str());
+  logger.info("Wi-Fi connected, IP: %s", WiFi.localIP().toString().c_str());
 }
 
 void maintainMQTTConnection() {
   while (!mqttClient.connected()) {
-    log.info("Attempting MQTT connection as %s...", clientId.c_str());
+    logger.info("Attempting MQTT connection as %s...", clientId.c_str());
     if (mqttClient.connect(clientId.c_str())) {
-      log.info("MQTT connected");
+      logger.info("MQTT connected");
     } else {
-      log.warn("MQTT failed, rc=%d. Retrying in 5s...", mqttClient.state());
+      logger.warn("MQTT failed, rc=%d. Retrying in 5s...", mqttClient.state());
       delay(5000);
     }
   }
@@ -89,7 +89,7 @@ void setup() {
   Serial.begin(115200);
 
   delay(10000);
-  log.info("ESP32-C3 BME680 Node Starting");
+  logger.info("ESP32-C3 BME680 Node Starting");
 
   char* device_name = "living_room_env_sensor";  // only needed on first upload to set the NVS value
   char* room_name = "living_room";               // only needed on first upload to set the NVS value
@@ -97,11 +97,11 @@ void setup() {
 
   Wire.begin(I2C_SDA, I2C_SCL);
 
-  log.info("Scanning I2C bus...");
+  logger.info("Scanning I2C bus...");
   for (uint8_t addr = 1; addr < 127; addr++) {
     Wire.beginTransmission(addr);
     if (Wire.endTransmission() == 0) {
-      log.info("Found I2C device at 0x%02X", addr);
+      logger.info("Found I2C device at 0x%02X", addr);
     }
   }
 
@@ -109,19 +109,19 @@ void setup() {
   const uint8_t candidates[] = {0x77, 0x76};
   for (uint8_t i = 0; i < sizeof(candidates); i++) {
     uint8_t a = candidates[i];
-    log.info("Trying BME680 at 0x%02X", a);
+    logger.info("Trying BME680 at 0x%02X", a);
     if (bme.begin(a)) {
-      log.info("BME680 initialized at 0x%02X", a);
+      logger.info("BME680 initialized at 0x%02X", a);
       found = true;
       break;
     } else {
-      log.warn("No BME680 at 0x%02X", a);
+      logger.warn("No BME680 at 0x%02X", a);
     }
     delay(200);
   }
 
   if (!found) {
-    log.error("Could not find BME680 — check wiring, power (3.3V), SDA/SCL pins");
+    logger.error("Could not find BME680 — check wiring, power (3.3V), SDA/SCL pins");
     while (1) { delay(1000); }
   }
 
@@ -151,7 +151,7 @@ void loop() {
     lastMsgTime = now;
 
     if (!bme.performReading()) {
-      log.error("Failed to perform BME680 reading");
+      logger.error("Failed to perform BME680 reading");
       publishLog("error", "Failed to perform BME680 sensor reading");
       return;
     }
@@ -163,10 +163,10 @@ void loop() {
     float gasResis = bme.gas_resistance / 1000.0;
     float iaq = computeIAQ(gasResis, humidity);
 
-    log.info("Temp: %.2fF | Humid: %.2f%% | Press: %.2f hPa | Gas: %.2f KΩ | IAQ: %.1f",
+    logger.info("Temp: %.2fF | Humid: %.2f%% | Press: %.2f hPa | Gas: %.2f KΩ | IAQ: %.1f",
              tempF, humidity, pressure, gasResis, iaq);
 
-    StaticJsonDocument<192> doc;
+    JsonDocument doc;
     char out[256];
 
     doc.clear();
@@ -205,6 +205,6 @@ void loop() {
     serializeJson(doc, out);
     mqttClient.publish(topicGas, out);
 
-    log.info("Metrics dispatched");
+    logger.info("Metrics dispatched");
   }
 }

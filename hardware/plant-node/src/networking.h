@@ -58,7 +58,7 @@ class Networking {
 
   void publishLog(const char* level, const char* message) {
     if (!client.connected()) return;
-    StaticJsonDocument<256> doc;
+    JsonDocument doc;
     char out[320];
     doc["device_id"] = Device::getDeviceID();
     doc["device_name"] = Device::getDeviceName();
@@ -69,7 +69,7 @@ class Networking {
   }
 
   void handlePumpCycleComplete(int duration, int eventId) {
-    StaticJsonDocument<200> response;
+    JsonDocument response;
     response["event_id"] = eventId;
     response["status"] = SHARED_STATUS_COMPLETE;
     response["duration"] = duration;
@@ -82,7 +82,7 @@ class Networking {
   }
 
   void publishWaterLevelEvent(char* topic, byte* payload, unsigned int length) {
-    StaticJsonDocument<512> doc;
+    JsonDocument doc;
     DeserializationError error = deserializeJson(doc, payload, length);
 
     if (error) {
@@ -92,7 +92,7 @@ class Networking {
 
     const char* action = doc["action"];
     int eventId = doc["event_id"] | 0;
-    int duration = doc.containsKey("duration_ms") ? doc["duration_ms"].as<int>() : 3000;
+    int duration = doc["duration_ms"].is<int>() ? doc["duration_ms"].as<int>() : 3000;
 
     // We no longer check sensorNode here.
     // We just emit the event if the action matches.
@@ -152,7 +152,7 @@ class Networking {
       log.info("MQTT publish skipped — client not connected");
       return;
     }
-    StaticJsonDocument<256> doc;
+    JsonDocument doc;
     doc["device_id"] = Device::getDeviceID();
     doc["device_name"] = Device::getDeviceName();
     doc["room"] = Device::getFriendlyRoomName();  // e.g. "living_room"
