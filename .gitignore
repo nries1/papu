@@ -20,3 +20,8 @@ data/
 server/dist/
 
 LAUNCH.md
+
+**/.pio/
+
+ota_err.txt
+ota_out.txt
