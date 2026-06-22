@@ -29,6 +29,8 @@ import {
   getLatestWaterEventPerDevice,
   getUserDisplayName,
   getAllDisplayNames,
+  getDevicesWithStatus,
+  createDevice,
 } from '../database/dao';
 
 const app = express();
@@ -323,6 +325,38 @@ app.get('/api/devices', async (req, res) => {
       .json({ error: dbError!.name, debugId: dbError!.debugId });
   }
   return res.status(200).json(rows);
+});
+
+app.get('/api/devices/status', async (req, res) => {
+  const { success, rows, dbError } = await getDevicesWithStatus();
+  if (!success) {
+    return res
+      .status(400)
+      .json({ error: dbError!.name, debugId: dbError!.debugId });
+  }
+  return res.status(200).json(rows);
+});
+
+app.post('/api/admin/devices', async (req, res) => {
+  const { device_id, friendly_name, device_type, room_name } = req.body as {
+    device_id: string;
+    friendly_name: string;
+    device_type: string;
+    room_name: string;
+  };
+
+  if (!device_id || !friendly_name || !device_type || !room_name) {
+    return res.status(400).json({ error: 'device_id, friendly_name, device_type, and room_name are required' });
+  }
+  if (!/^[A-Za-z0-9_-]+$/.test(device_id)) {
+    return res.status(400).json({ error: 'device_id must be alphanumeric with hyphens/underscores only' });
+  }
+
+  const { success, dbError } = await createDevice({ device_id, friendly_name, device_type, room_name });
+  if (!success) {
+    return res.status(400).json({ error: dbError!.name, debugId: dbError!.debugId });
+  }
+  return res.status(201).json({ success: true });
 });
 
 app.get('/api/rooms', async (req, res) => {

@@ -153,6 +153,16 @@ void setup() {
   lastMsgTime = millis() - interval;  // trigger first reading immediately on boot
   maintainMQTTConnection();
   publishLog("info", "Device startup complete");
+
+  {
+    JsonDocument bootDoc;
+    char bootMsg[200];
+    bootDoc["device_id"] = Device::getDeviceID();
+    bootDoc["device_name"] = Device::getDeviceName();
+    bootDoc["ip"] = WiFi.localIP().toString();
+    serializeJson(bootDoc, bootMsg);
+    mqttClient.publish(SHARED_TOPIC_DEVICE_BOOT, bootMsg);
+  }
 }
 
 void loop() {

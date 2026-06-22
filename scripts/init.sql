@@ -105,3 +105,9 @@ CREATE TABLE IF NOT EXISTS users (
   email        TEXT PRIMARY KEY,
   display_name TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS device_presence (
+  device_id  TEXT PRIMARY KEY,
+  ip_address TEXT,
+  last_boot  TIMESTAMPTZ NOT NULL DEFAULT now()
+);

@@ -15,6 +15,7 @@ import type {
   SystemLog,
   SensorHealthMetrics,
   DailyStdDev,
+  DeviceWithStatus,
 } from './types';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -652,6 +653,96 @@ export async function removePhotoReaction({
       .execute()
       .then(() => undefined)
   );
+}
+
+// ── Device presence ───────────────────────────────────────────────────────────
+
+export async function upsertDevicePresence({
+  device_id,
+  ip_address,
+}: {
+  device_id: string;
+  ip_address: string;
+}): Promise<void> {
+  try {
+    await db
+      .insertInto('device_presence')
+      .values({ device_id, ip_address, last_boot: new Date() })
+      .onConflict((oc) =>
+        oc.column('device_id').doUpdateSet({ ip_address, last_boot: new Date() })
+      )
+      .execute();
+  } catch (err) {
+    console.log('Failed to upsert device presence:', err);
+  }
+}
+
+export async function getDevicesWithStatus(): Promise<{
+  success: boolean;
+  dbError?: DbError;
+  rows: DeviceWithStatus[];
+}> {
+  return tryRows('getDevicesWithStatus', async () => {
+    const result = await sql<DeviceWithStatus>`
+      SELECT
+        d.device_id,
+        d.friendly_name,
+        d.device_type,
+        r.name        AS room_name,
+        r.display_name AS room_display_name,
+        dp.ip_address,
+        dp.last_boot,
+        GREATEST(
+          dp.last_boot,
+          (SELECT MAX(dl.timestamp) FROM device_logs dl         WHERE dl.device_id = d.device_id),
+          (SELECT MAX(er.timestamp) FROM environment_readings er WHERE er.device_id = d.device_id),
+          (SELECT MAX(tr.timestamp) FROM tank_readings tr        WHERE tr.device_id = d.device_id)
+        ) AS last_seen,
+        EXISTS(
+          SELECT 1 FROM device_logs dl
+          WHERE dl.device_id = d.device_id
+            AND dl.timestamp > NOW() - INTERVAL '12 hours'
+        ) AS healthy,
+        COALESCE(
+          GREATEST(
+            dp.last_boot,
+            (SELECT MAX(dl.timestamp) FROM device_logs dl         WHERE dl.device_id = d.device_id),
+            (SELECT MAX(er.timestamp) FROM environment_readings er WHERE er.device_id = d.device_id),
+            (SELECT MAX(tr.timestamp) FROM tank_readings tr        WHERE tr.device_id = d.device_id)
+          ) > NOW() - INTERVAL '2 hours',
+          false
+        ) AS ota_available
+      FROM devices d
+      LEFT JOIN rooms r           ON r.id          = d.room_id
+      LEFT JOIN device_presence dp ON dp.device_id = d.device_id
+      ORDER BY r.display_name, d.friendly_name
+    `.execute(db);
+    return result.rows;
+  });
+}
+
+export async function createDevice({
+  device_id,
+  friendly_name,
+  device_type,
+  room_name,
+}: {
+  device_id: string;
+  friendly_name: string;
+  device_type: string;
+  room_name: string;
+}): Promise<{ success: boolean; dbError?: DbError }> {
+  return tryMutate('createDevice', async () => {
+    const room = await db
+      .selectFrom('rooms')
+      .select('id')
+      .where('name', '=', room_name)
+      .executeTakeFirst();
+    await db
+      .insertInto('devices')
+      .values({ device_id, friendly_name, device_type, room_id: room?.id ?? null })
+      .execute();
+  });
 }
 
 // ── Schema maintenance ────────────────────────────────────────────────────────

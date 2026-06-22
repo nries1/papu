@@ -81,3 +81,16 @@ export interface DailyStdDev {
   day: Date;
   daily_stddev: number;
 }
+
+export interface DeviceWithStatus {
+  device_id: string;
+  friendly_name: string | null;
+  device_type: string | null;
+  room_name: string | null;
+  room_display_name: string | null;
+  ip_address: string | null;
+  last_boot: Date | null;
+  last_seen: Date | null;
+  healthy: boolean;
+  ota_available: boolean;
+}

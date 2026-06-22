@@ -107,6 +107,12 @@ interface UsersTable {
   display_name: string;
 }
 
+interface DevicePresenceTable {
+  device_id: string;
+  ip_address: string | null;
+  last_boot: ColumnType<Date, Date | undefined, Date>;
+}
+
 export interface Database {
   watering_events: WateringEventsTable;
   tank_readings: TankReadingsTable;
@@ -120,4 +126,5 @@ export interface Database {
   ai_summaries: AiSummariesTable;
   photo_reactions: PhotoReactionsTable;
   users: UsersTable;
+  device_presence: DevicePresenceTable;
 }

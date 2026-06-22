@@ -1,0 +1,419 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Devices | Papu Home</title>
+    <link rel="stylesheet" href="css/dashboard.css" />
+    <style>
+      .devices-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+        gap: 20px;
+      }
+
+      .device-card {
+        background: var(--card-bg);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 16px;
+        padding: 20px 24px;
+        transition: transform 0.2s, border-color 0.2s;
+      }
+
+      .device-card:hover {
+        transform: translateY(-2px);
+        border-color: var(--accent-blue);
+      }
+
+      .device-header {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        margin-bottom: 14px;
+        gap: 10px;
+      }
+
+      .device-name {
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: var(--text-main);
+        margin: 0;
+        line-height: 1.3;
+      }
+
+      .device-type {
+        font-size: 0.7rem;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--text-dim);
+        margin-top: 2px;
+      }
+
+      .status-badges {
+        display: flex;
+        gap: 6px;
+        flex-shrink: 0;
+      }
+
+      .badge {
+        font-size: 0.65rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        padding: 3px 8px;
+        border-radius: 9999px;
+        white-space: nowrap;
+      }
+
+      .badge-online  { background: rgba(74,222,128,0.15); color: #4ade80; border: 1px solid rgba(74,222,128,0.3); }
+      .badge-offline { background: rgba(248,113,113,0.15); color: #f87171; border: 1px solid rgba(248,113,113,0.3); }
+      .badge-ota     { background: rgba(56,189,248,0.15);  color: #38bdf8; border: 1px solid rgba(56,189,248,0.3); }
+      .badge-healthy { background: rgba(74,222,128,0.10);  color: #86efac; border: 1px solid rgba(74,222,128,0.2); }
+      .badge-stale   { background: rgba(251,191,36,0.10);  color: #fbbf24; border: 1px solid rgba(251,191,36,0.2); }
+
+      .device-meta {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px 16px;
+        margin-top: 12px;
+        font-size: 0.82rem;
+      }
+
+      .meta-item label {
+        display: block;
+        font-size: 0.68rem;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--text-dim);
+        margin-bottom: 2px;
+      }
+
+      .meta-item span {
+        color: var(--text-main);
+        word-break: break-all;
+      }
+
+      .meta-item span.dim { color: var(--text-dim); }
+
+      .add-btn {
+        background: var(--accent-blue);
+        color: #0f172a;
+        border: none;
+        padding: 10px 20px;
+        font-size: 0.85rem;
+        font-weight: 700;
+        cursor: pointer;
+        border-radius: 10px;
+        transition: opacity 0.2s;
+      }
+      .add-btn:hover { opacity: 0.85; }
+
+      /* Modal */
+      .modal-overlay {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(0,0,0,0.7);
+        z-index: 100;
+        align-items: center;
+        justify-content: center;
+      }
+      .modal-overlay.open { display: flex; }
+
+      .modal {
+        background: #1e293b;
+        border: 1px solid #334155;
+        border-radius: 16px;
+        padding: 28px;
+        width: 400px;
+        max-width: 90vw;
+      }
+
+      .modal h2 {
+        margin: 0 0 20px;
+        font-size: 1rem;
+        color: var(--text-main);
+      }
+
+      .form-group {
+        margin-bottom: 14px;
+      }
+
+      .form-group label {
+        display: block;
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--text-dim);
+        margin-bottom: 5px;
+      }
+
+      .form-group input,
+      .form-group select {
+        width: 100%;
+        background: #334155;
+        border: 1px solid #475569;
+        color: white;
+        padding: 9px 12px;
+        border-radius: 8px;
+        font-size: 0.9rem;
+        box-sizing: border-box;
+      }
+
+      .form-group select option { background: #1e293b; }
+
+      .form-actions {
+        display: flex;
+        gap: 10px;
+        margin-top: 20px;
+      }
+
+      .btn-cancel {
+        flex: 1;
+        background: transparent;
+        border: 1px solid #475569;
+        color: var(--text-dim);
+        padding: 9px;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 0.85rem;
+      }
+      .btn-cancel:hover { border-color: #94a3b8; color: var(--text-main); }
+
+      .btn-save {
+        flex: 2;
+        background: var(--accent-blue);
+        border: none;
+        color: #0f172a;
+        padding: 9px;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 0.85rem;
+        font-weight: 700;
+      }
+      .btn-save:hover { opacity: 0.85; }
+
+      #error-msg {
+        color: var(--accent-red);
+        font-size: 0.8rem;
+        margin-top: 8px;
+        display: none;
+      }
+
+      .empty-state {
+        grid-column: 1 / -1;
+        text-align: center;
+        color: var(--text-dim);
+        padding: 60px 20px;
+        font-size: 0.95rem;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Devices</h1>
+      <div style="display:flex; align-items:center; gap:16px;">
+        <a href="index.html">← Back to Home</a>
+        <button class="add-btn" id="open-add-modal">+ Add Device</button>
+      </div>
+    </header>
+
+    <div class="devices-grid" id="devices-grid">
+      <div class="empty-state">Loading devices...</div>
+    </div>
+
+    <!-- Add Device Modal -->
+    <div class="modal-overlay" id="modal-overlay">
+      <div class="modal">
+        <h2>Add Device</h2>
+        <div class="form-group">
+          <label>Device ID <span style="font-size:0.65rem;color:#64748b;">(MAC-based, e.g. C1D4D8 — from Serial monitor)</span></label>
+          <input type="text" id="f-device-id" placeholder="C1D4D8" maxlength="32" />
+        </div>
+        <div class="form-group">
+          <label>Friendly Name</label>
+          <input type="text" id="f-friendly-name" placeholder="Living Room Env Sensor" maxlength="64" />
+        </div>
+        <div class="form-group">
+          <label>Device Type</label>
+          <select id="f-device-type">
+            <option value="env_sensor">Environment Sensor</option>
+            <option value="pump">Water Pump Node</option>
+            <option value="rgb_display">RGB Display</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Room</label>
+          <select id="f-room"></select>
+        </div>
+        <div id="error-msg"></div>
+        <div class="form-actions">
+          <button class="btn-cancel" id="close-modal">Cancel</button>
+          <button class="btn-save" id="save-device">Add Device</button>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const grid = document.getElementById('devices-grid');
+      let roomsCache = [];
+
+      function relativeTime(ts) {
+        if (!ts) return '—';
+        const diff = Date.now() - new Date(ts).getTime();
+        const mins = Math.floor(diff / 60000);
+        if (mins < 1)  return 'just now';
+        if (mins < 60) return mins + 'm ago';
+        const hrs = Math.floor(mins / 60);
+        if (hrs < 24)  return hrs + 'h ago';
+        const days = Math.floor(hrs / 24);
+        return days + 'd ago';
+      }
+
+      function renderDevices(devices) {
+        if (!devices.length) {
+          grid.innerHTML = '<div class="empty-state">No devices registered yet. Add one with the button above.</div>';
+          return;
+        }
+
+        grid.innerHTML = devices.map(d => {
+          const online  = d.ota_available;
+          const healthy = d.healthy;
+
+          const onlineBadge  = online
+            ? '<span class="badge badge-online">Online</span>'
+            : '<span class="badge badge-offline">Offline</span>';
+          const otaBadge     = online  ? '<span class="badge badge-ota">OTA</span>' : '';
+          const healthBadge  = healthy
+            ? '<span class="badge badge-healthy">Healthy</span>'
+            : '<span class="badge badge-stale">No recent logs</span>';
+
+          const typeLabel = {
+            env_sensor:  'Environment Sensor',
+            pump:        'Water Pump Node',
+            rgb_display: 'RGB Display',
+          }[d.device_type] ?? d.device_type ?? '—';
+
+          return `
+            <div class="device-card">
+              <div class="device-header">
+                <div>
+                  <p class="device-name">${d.friendly_name ?? d.device_id}</p>
+                  <p class="device-type">${typeLabel}</p>
+                </div>
+                <div class="status-badges">
+                  ${onlineBadge}
+                  ${otaBadge}
+                </div>
+              </div>
+              <div style="margin-bottom:8px;">${healthBadge}</div>
+              <div class="device-meta">
+                <div class="meta-item">
+                  <label>Room</label>
+                  <span>${d.room_display_name ?? d.room_name ?? '—'}</span>
+                </div>
+                <div class="meta-item">
+                  <label>Device ID</label>
+                  <span>${d.device_id}</span>
+                </div>
+                <div class="meta-item">
+                  <label>IP Address</label>
+                  <span>${d.ip_address ?? '<span class="dim">—</span>'}</span>
+                </div>
+                <div class="meta-item">
+                  <label>Last Boot</label>
+                  <span title="${d.last_boot ? new Date(d.last_boot).toLocaleString() : ''}">${relativeTime(d.last_boot)}</span>
+                </div>
+                <div class="meta-item">
+                  <label>Last Seen</label>
+                  <span title="${d.last_seen ? new Date(d.last_seen).toLocaleString() : ''}">${relativeTime(d.last_seen)}</span>
+                </div>
+              </div>
+            </div>
+          `;
+        }).join('');
+      }
+
+      async function loadDevices() {
+        try {
+          const resp = await fetch('/api/devices/status');
+          const data = await resp.json();
+          renderDevices(Array.isArray(data) ? data : []);
+        } catch (e) {
+          grid.innerHTML = '<div class="empty-state" style="color:#f87171;">Failed to load devices.</div>';
+        }
+      }
+
+      async function loadRoomsForModal() {
+        try {
+          const resp  = await fetch('/api/rooms');
+          roomsCache  = await resp.json();
+          const sel   = document.getElementById('f-room');
+          sel.innerHTML = roomsCache.map(r =>
+            `<option value="${r.name}">${r.display_name ?? r.name}</option>`
+          ).join('');
+        } catch (e) {
+          console.error('Failed to load rooms', e);
+        }
+      }
+
+      // Modal wiring
+      const overlay = document.getElementById('modal-overlay');
+
+      document.getElementById('open-add-modal').addEventListener('click', () => {
+        overlay.classList.add('open');
+        loadRoomsForModal();
+      });
+
+      document.getElementById('close-modal').addEventListener('click', () => {
+        overlay.classList.remove('open');
+        document.getElementById('error-msg').style.display = 'none';
+      });
+
+      overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) overlay.classList.remove('open');
+      });
+
+      document.getElementById('save-device').addEventListener('click', async () => {
+        const errEl = document.getElementById('error-msg');
+        errEl.style.display = 'none';
+
+        const device_id    = document.getElementById('f-device-id').value.trim();
+        const friendly_name = document.getElementById('f-friendly-name').value.trim();
+        const device_type  = document.getElementById('f-device-type').value;
+        const room_name    = document.getElementById('f-room').value;
+
+        if (!device_id || !friendly_name) {
+          errEl.textContent = 'Device ID and Friendly Name are required.';
+          errEl.style.display = 'block';
+          return;
+        }
+
+        try {
+          const resp = await fetch('/api/admin/devices', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ device_id, friendly_name, device_type, room_name }),
+          });
+          const result = await resp.json();
+          if (!resp.ok) {
+            errEl.textContent = result.error ?? 'Failed to add device.';
+            errEl.style.display = 'block';
+            return;
+          }
+          overlay.classList.remove('open');
+          document.getElementById('f-device-id').value = '';
+          document.getElementById('f-friendly-name').value = '';
+          loadDevices();
+        } catch (e) {
+          errEl.textContent = 'Network error — could not save device.';
+          errEl.style.display = 'block';
+        }
+      });
+
+      // Load and auto-refresh
+      loadDevices();
+      setInterval(loadDevices, 30000);
+    </script>
+  </body>
+</html>

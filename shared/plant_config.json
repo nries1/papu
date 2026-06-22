@@ -10,5 +10,6 @@
   "environment_humidity_1f_topic": "home/sensors/humidity",
   "environment_pressure_1f_topic": "home/sensors/pressure",
   "environment_gas_1f_topic": "home/sensors/iaq",
-  "device_logs_topic": "home/devices/logs"
+  "device_logs_topic": "home/devices/logs",
+  "device_boot_topic": "home/devices/boot"
 }

@@ -9,6 +9,7 @@ import {
   appendEnvironmentReading,
   getRoomIdForDevice,
   appendDeviceLog,
+  upsertDevicePresence,
 } from '../database/dao';
 
 interface WaterCommandPayload {
@@ -33,6 +34,7 @@ client.on('connect', async () => {
     SHARED.environment_pressure_1f_topic,
     SHARED.environment_gas_1f_topic,
     SHARED.device_logs_topic,
+    SHARED.device_boot_topic,
     'robot/vision/result',
   ];
 
@@ -116,6 +118,14 @@ client.on('message', async (topic: string, message: Buffer) => {
       log_level: (data['log_level'] ?? 'info') as string,
       message: data['message'] as string,
     });
+  }
+
+  if (topic === SHARED.device_boot_topic) {
+    const device_id = (data['device_id'] ?? data['device_name'] ?? '') as string;
+    const ip_address = (data['ip'] ?? '') as string;
+    if (device_id) {
+      await upsertDevicePresence({ device_id, ip_address });
+    }
   }
 
   const envTopicMap: Record<string, string> = {

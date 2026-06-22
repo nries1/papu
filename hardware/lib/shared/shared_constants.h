@@ -11,5 +11,6 @@ static const char* SHARED_TOPIC_HUMIDITY_1F = "home/sensors/humidity";
 static const char* SHARED_TOPIC_PRESSURE_1F = "home/sensors/pressure";
 static const char* SHARED_TOPIC_GAS_1F = "home/sensors/iaq";
 static const char* SHARED_TOPIC_DEVICE_LOGS = "home/devices/logs";
+static const char* SHARED_TOPIC_DEVICE_BOOT = "home/devices/boot";
 
 #endif

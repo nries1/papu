@@ -56,6 +56,16 @@ class Networking {
     listeners.push_back(cb);
   }
 
+  void publishBootEvent() {
+    JsonDocument doc;
+    char buf[200];
+    doc["device_id"] = Device::getDeviceID();
+    doc["device_name"] = Device::getDeviceName();
+    doc["ip"] = WiFi.localIP().toString();
+    serializeJson(doc, buf);
+    client.publish(SHARED_TOPIC_DEVICE_BOOT, buf);
+  }
+
   void publishLog(const char* level, const char* message) {
     if (!client.connected()) return;
     JsonDocument doc;
@@ -138,6 +148,7 @@ class Networking {
         String resolvedTopic = String(topic); resolvedTopic.replace("{device_id}", clientId); client.subscribe(resolvedTopic.c_str());
         log.info("Re-subscribed to: %s", topic);
         publishLog("info", "Device startup complete");
+        publishBootEvent();
       } else {
         log.info("failed, rc=%d", client.state());
         publishLog("error", "MQTT connection failed");
