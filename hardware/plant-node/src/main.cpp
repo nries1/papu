@@ -28,12 +28,13 @@ Device device;
 
 void setup() {
   Serial.setDebugOutput(true);
-
   Serial.begin(115200);
 
-  // CRITICAL: The CLI monitor connects fast.
-  // Give the USB driver time to initialize.
-  delay(10000);
+  // On native USB CDC, wait up to 5s for a host to open the port before
+  // proceeding. Prevents output from being dropped when the CDC connection
+  // isn't ready yet. Falls through after 5s so deployed devices don't hang.
+  unsigned long t = millis();
+  while (!Serial && millis() - t < 5000) delay(10);
 
   Serial.println("\n\n=====================");
   Serial.println("PORT OPENED SUCCESSFULLY");

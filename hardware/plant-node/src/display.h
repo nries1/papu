@@ -55,9 +55,8 @@ class Display {
 
   void begin() {
     delay(1000);
-    // Deterministic Metro setup: assume Metro SDA=21, SCL=22 and LCD at 0x27
-    log.info("Display init: initializing I2C for Metro (SDA=21,SCL=22)...");
-    Wire.begin(21, 22);  // SDA, SCL
+    log.info("Display init: initializing I2C (SDA=%d, SCL=%d)...", SDA, SCL);
+    Wire.begin();
     log.info("Scanning I2C bus...");
     for (byte addr = 0x01; addr < 0x7F; addr++) {
       Wire.beginTransmission(addr);

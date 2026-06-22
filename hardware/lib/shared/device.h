@@ -57,8 +57,6 @@ class Device {
     return String(room);
   }
   void begin(const char* name, const char* room) {
-    Serial.begin(115200);
-
     // NVS must be initialized once at boot
     nvs_flash_init();
 
