@@ -32,4 +32,10 @@ function run(script, extraArgs) {
 
 run('flash.js',       ['--target', 'upload',  ...passthrough]);
 run('log_release.js', ['--model', model]);
+
+// Give the device time to reboot and re-enumerate its USB CDC port before
+// the monitor tries to connect. Native USB boards disconnect briefly on reset.
+console.log('Waiting for device to reboot...');
+Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 3000);
+
 run('flash.js',       ['--target', 'monitor', ...passthrough]);

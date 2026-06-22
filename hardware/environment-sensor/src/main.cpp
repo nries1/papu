@@ -102,8 +102,9 @@ void maintainMQTTConnection() {
 
 void setup() {
   Serial.begin(115200);
+  unsigned long t = millis();
+  while (!Serial && millis() - t < 5000) delay(10);
 
-  delay(10000);
   logger.info("ESP32-C3 BME680 Node Starting");
 
   const char* device_name = TO_STRING(DEVICE_NAME);  // set via flash.js --name (default: env_sensor)

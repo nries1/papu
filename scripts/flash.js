@@ -14,7 +14,17 @@
 //   npm run env:upload  -- --name office_env_sensor --room office
 //   npm run env:monitor -- --transport ota --name office_env_sensor
 
-const { execSync, spawnSync } = require('child_process');
+const { execSync, spawnSync, spawn } = require('child_process');
+
+// Resolve pio to an absolute path so spawn/spawnSync can find it regardless
+// of whether the npm process inherits the user's full shell PATH.
+function resolvePio() {
+  try { return execSync('which pio', { encoding: 'utf8' }).trim(); } catch {}
+  const fallback = require('path').join(require('os').homedir(), '.platformio/penv/bin/pio');
+  if (require('fs').existsSync(fallback)) return fallback;
+  console.error('Cannot find pio. Install PlatformIO or add it to PATH.');
+  process.exit(1);
+}
 const path = require('path');
 
 function arg(name) {
@@ -114,14 +124,15 @@ if (transport === 'ota') {
 const projectDir = path.resolve(__dirname, '..', 'hardware', project);
 const isWindows  = process.platform === 'win32';
 
+const pio = resolvePio();
 let cmd, cmdArgs;
 if (target === 'upload') {
   const uploadPort = transport === 'ota' ? otaHost : serialPort;
-  cmd     = 'pio';
+  cmd     = pio;
   cmdArgs = ['run', '-d', projectDir, '-e', env, '--target', 'upload', '--upload-port', uploadPort];
 } else if (target === 'monitor') {
   const monitorPort = transport === 'ota' ? `socket://${otaHost}:23` : serialPort;
-  cmd     = 'pio';
+  cmd     = pio;
   cmdArgs = ['device', 'monitor', '-d', projectDir, '-e', env, '--port', monitorPort];
 } else {
   console.error(`Unknown target: ${target}. Use "upload" or "monitor".`);
@@ -147,5 +158,13 @@ if (target === 'upload') {
   }
 }
 
-const result = spawnSync(cmd, cmdArgs, { stdio: 'inherit', shell: isWindows, env: childEnv });
-process.exit(result.status ?? 0);
+// For the monitor target, use spawn (async) instead of spawnSync so the child
+// process properly inherits the TTY. spawnSync breaks TTY inheritance for
+// interactive programs like pio device monitor when called through npm/node.
+if (target === 'monitor') {
+  const child = spawn(cmd, cmdArgs, { stdio: 'inherit', shell: isWindows, env: childEnv });
+  child.on('exit', code => process.exit(code ?? 0));
+} else {
+  const result = spawnSync(cmd, cmdArgs, { stdio: 'inherit', shell: isWindows, env: childEnv });
+  process.exit(result.status ?? 0);
+}
