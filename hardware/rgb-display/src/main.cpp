@@ -10,6 +10,16 @@
 #include "logger.h"
 #include "ota.h"
 
+// --- Device identity -------------------------------------------------------
+// Overridden at flash time via flash.js --name build flag; --name also sets the
+// OTA host (<name>.local). Default preserves the original hostname.
+#define STRINGIFY(x) #x
+#define TO_STRING(x) STRINGIFY(x)
+
+#ifndef DEVICE_NAME
+#define DEVICE_NAME rgb-display
+#endif
+
 // Seengreat Adapter Board E — V2.x pin mapping (ESP32-S3 DevKitC-1 form factor)
 #define R1_PIN 18
 #define G1_PIN  8
@@ -299,7 +309,7 @@ void setup() {
   display->setBrightness8(0);
 
   connectWiFi();
-  OTAService::begin("rgb-display");
+  OTAService::begin(TO_STRING(DEVICE_NAME));  // set via flash.js --name (default: rgb-display)
 
   display->setBrightness8(30);
   configTime(TZ_OFFSET_SEC, TZ_DST_SEC, "pool.ntp.org");

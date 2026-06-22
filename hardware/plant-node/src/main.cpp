@@ -7,6 +7,19 @@
 #include "pump.h"
 #include "sensor.h"
 
+// --- Device identity -------------------------------------------------------
+// Overridden at flash time via flash.js --name / --room build flags; --name also
+// sets the OTA host (<name>.local). Defaults preserve the original values.
+#define STRINGIFY(x) #x
+#define TO_STRING(x) STRINGIFY(x)
+
+#ifndef DEVICE_NAME
+#define DEVICE_NAME office_tower
+#endif
+#ifndef ROOM_NAME
+#define ROOM_NAME office
+#endif
+
 Networking plantComms;
 SensorNode sensorNode;
 Display display;
@@ -26,11 +39,8 @@ void setup() {
   Serial.println("PORT OPENED SUCCESSFULLY");
   Serial.println("=====================");
 
-  char* device_name =
-      "office_tower";  // only needed on first upload to set the NVS value, can be left as ""
-                            // on subsequent uploads to preserve the name in NVS
-  char* room_name = "office";  // only needed on first upload to set the NVS value, can be left
-                                    // as "" on subsequent uploads to preserve the room name in NVS
+  const char* device_name = TO_STRING(DEVICE_NAME);  // set via flash.js --name (default: office_tower)
+  const char* room_name = TO_STRING(ROOM_NAME);      // set via flash.js --room (default: office)
   device.begin(device_name, room_name);
   // Display::begin() will initialize and scan I2C on the Metro pins.
 
