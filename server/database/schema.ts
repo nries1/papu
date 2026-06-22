@@ -27,6 +27,7 @@ interface DevicesTable {
   room_id: number | null;
   friendly_name: string | null;
   device_type: string | null;
+  has_ota: boolean;
 }
 
 interface RoomsTable {

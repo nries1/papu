@@ -34,3 +34,61 @@
 1780503428: Client robot-vision-worker [172.18.0.3:52771] disconnected: connection closed by client.
 1780503429: New connection from 172.18.0.3:39715 on port 1883.
 1780503429: New client connected from 172.18.0.3:39715 as robot-vision-worker (p4, c1, k60).
+1782156410: mosquitto version 2.1.2 starting
+1782156410: Config loaded from /mosquitto/config/mosquitto.conf.
+1782156410: Bridge support available.
+1782156410: Persistence support available.
+1782156410: TLS support available.
+1782156410: TLS-PSK support available.
+1782156410: Websockets support available.
+1782156410: Opening ipv4 listen socket on port 1883.
+1782156410: Opening ipv4 listen socket on port 9001.
+1782156410: mosquitto version 2.1.2 running
+1782156411: New connection from 172.20.0.2:60056 on port 1883.
+1782156411: New client connected from 172.20.0.2:60056 as mqttjs_99e0e1a2 (p4, c1, k60).
+1782156415: New connection from 192.168.1.165:54299 on port 1883.
+1782156415: New connection from 192.168.1.158:64376 on port 1883.
+1782156415: New client connected from 192.168.1.165:54299 as E6B740 (p4, c1, k15).
+1782156415: New connection from 192.168.1.164:61729 on port 1883.
+1782156415: New client connected from 192.168.1.164:61729 as C1D4D8 (p4, c1, k15).
+1782156415: New client connected from 192.168.1.158:64376 as 5865D0 (p4, c1, k15).
+1782157623: Client mqttjs_99e0e1a2 [172.20.0.2:60056] disconnected: connection closed by client.
+1782157624: New connection from 172.20.0.2:48938 on port 1883.
+1782157624: New client connected from 172.20.0.2:48938 as mqttjs_d69c081b (p4, c1, k60).
+1782157745: mosquitto version 2.1.2 terminating
+1782157745: Saving in-memory database to /mosquitto/data//mosquitto.db.
+1782157761: mosquitto version 2.1.2 starting
+1782157761: Config loaded from /mosquitto/config/mosquitto.conf.
+1782157761: Bridge support available.
+1782157761: Persistence support available.
+1782157761: TLS support available.
+1782157761: TLS-PSK support available.
+1782157761: Websockets support available.
+1782157761: Opening ipv4 listen socket on port 1883.
+1782157761: Opening ipv4 listen socket on port 9001.
+1782157761: mosquitto version 2.1.2 running
+1782157762: New connection from 172.20.0.3:40990 on port 1883.
+1782157762: New client connected from 172.20.0.3:40990 as mqttjs_88945a61 (p4, c1, k60).
+1782157765: New connection from 192.168.1.165:54304 on port 1883.
+1782157765: New connection from 192.168.1.158:64381 on port 1883.
+1782157765: New client connected from 192.168.1.165:54304 as E6B740 (p4, c1, k15).
+1782157765: New client connected from 192.168.1.158:64381 as 5865D0 (p4, c1, k15).
+1782157765: New connection from 192.168.1.164:61734 on port 1883.
+1782157765: New client connected from 192.168.1.164:61734 as C1D4D8 (p4, c1, k15).
+1782157991: Client mqttjs_88945a61 [172.20.0.3:40990] disconnected: connection closed by client.
+1782157992: New connection from 172.20.0.3:49124 on port 1883.
+1782157992: New client connected from 172.20.0.3:49124 as mqttjs_592be02c (p4, c1, k60).
+1782158088: Client mqttjs_592be02c [172.20.0.3:49124] disconnected: connection closed by client.
+1782158089: New connection from 172.20.0.3:58612 on port 1883.
+1782158089: New client connected from 172.20.0.3:58612 as mqttjs_569ac3b6 (p4, c1, k60).
+1782158325: Client mqttjs_569ac3b6 [172.20.0.3:58612] disconnected: connection closed by client.
+1782158325: New connection from 172.20.0.3:48574 on port 1883.
+1782158325: New client connected from 172.20.0.3:48574 as mqttjs_81fb4450 (p4, c1, k60).
+1782158391: Client mqttjs_81fb4450 [172.20.0.3:48574] disconnected: connection closed by client.
+1782158392: New connection from 172.20.0.3:60468 on port 1883.
+1782158392: New client connected from 172.20.0.3:60468 as mqttjs_21fc4fba (p4, c1, k60).
+1782159562: Saving in-memory database to /mosquitto/data//mosquitto.db.
+1782161363: Saving in-memory database to /mosquitto/data//mosquitto.db.
+1782163164: Saving in-memory database to /mosquitto/data//mosquitto.db.
+1782164802: New connection from 192.168.1.153:63620 on port 1883.
+1782164802: New client connected from 192.168.1.153:63620 as C1E590 (p4, c1, k15).

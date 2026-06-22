@@ -246,6 +246,12 @@
           <label>Room</label>
           <select id="f-room"></select>
         </div>
+        <div class="form-group" style="display:flex; align-items:center; gap:10px;">
+          <input type="checkbox" id="f-has-ota" style="width:auto; accent-color:#38bdf8;" />
+          <label for="f-has-ota" style="text-transform:none; font-size:0.85rem; letter-spacing:0; cursor:pointer;">
+            Device has OTA firmware
+          </label>
+        </div>
         <div id="error-msg"></div>
         <div class="form-actions">
           <button class="btn-cancel" id="close-modal">Cancel</button>
@@ -270,6 +276,56 @@
         return days + 'd ago';
       }
 
+      function renderEnvReadings(d) {
+        const r = d.latest_env_readings;
+        const ts = d.latest_env_timestamp;
+        if (!r) return '';
+        const fmt = (v) => v != null ? Number(v).toFixed(1) : '—';
+        return `
+          <div style="margin-top:12px;padding-top:12px;border-top:1px solid #1e293b;">
+            <div style="font-size:0.68rem;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-dim);margin-bottom:8px;">
+              Last Reading — <span style="font-weight:400;">${relativeTime(ts)}</span>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 16px;font-size:0.82rem;">
+              <div><span style="color:var(--text-dim);">Temp</span> <span>${fmt(r.temperature_f)}°F</span></div>
+              <div><span style="color:var(--text-dim);">Humidity</span> <span>${fmt(r.humidity_pct)}%</span></div>
+              <div><span style="color:var(--text-dim);">Pressure</span> <span>${fmt(r.pressure_hpa)} hPa</span></div>
+              <div><span style="color:var(--text-dim);">IAQ</span> <span>${fmt(r.iaq)}</span></div>
+            </div>
+          </div>`;
+      }
+
+      function renderPumpReadings(d) {
+        const tank = d.latest_tank_reading;
+        const pump = d.latest_pump_event;
+        if (!tank && !pump) return '';
+        let html = '<div style="margin-top:12px;padding-top:12px;border-top:1px solid #1e293b;display:grid;grid-template-columns:1fr 1fr;gap:10px 16px;">';
+        if (tank) {
+          const pct = Math.round(tank.pct_full);
+          const barColor = pct > 30 ? '#4ade80' : pct > 10 ? '#fbbf24' : '#f87171';
+          html += `
+            <div>
+              <div style="font-size:0.68rem;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-dim);margin-bottom:4px;">Water Level</div>
+              <div style="font-size:0.9rem;">${Number(tank.gallons).toFixed(1)} gal <span style="color:var(--text-dim);">(${pct}%)</span></div>
+              <div style="margin-top:4px;height:4px;background:#1e293b;border-radius:2px;">
+                <div style="height:4px;border-radius:2px;background:${barColor};width:${Math.min(pct,100)}%;"></div>
+              </div>
+              <div style="font-size:0.7rem;color:var(--text-dim);margin-top:3px;">${relativeTime(tank.timestamp)}</div>
+            </div>`;
+        }
+        if (pump) {
+          const statusColor = pump.status === 'complete' ? '#4ade80' : pump.status?.startsWith('BLOCKED') ? '#f87171' : '#94a3b8';
+          html += `
+            <div>
+              <div style="font-size:0.68rem;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-dim);margin-bottom:4px;">Last Pump Event</div>
+              <div style="font-size:0.9rem;color:${statusColor};">${pump.status ?? '—'}</div>
+              <div style="font-size:0.7rem;color:var(--text-dim);margin-top:3px;">${relativeTime(pump.timestamp)}</div>
+            </div>`;
+        }
+        html += '</div>';
+        return html;
+      }
+
       function renderDevices(devices) {
         if (!devices.length) {
           grid.innerHTML = '<div class="empty-state">No devices registered yet. Add one with the button above.</div>';
@@ -277,22 +333,26 @@
         }
 
         grid.innerHTML = devices.map(d => {
-          const online  = d.ota_available;
+          const online  = d.healthy;
           const healthy = d.healthy;
 
-          const onlineBadge  = online
+          const onlineBadge = online
             ? '<span class="badge badge-online">Online</span>'
             : '<span class="badge badge-offline">Offline</span>';
-          const otaBadge     = online  ? '<span class="badge badge-ota">OTA</span>' : '';
-          const healthBadge  = healthy
+          const otaBadge = d.ota_available ? '<span class="badge badge-ota">OTA</span>' : '';
+          const healthBadge = healthy
             ? '<span class="badge badge-healthy">Healthy</span>'
             : '<span class="badge badge-stale">No recent logs</span>';
 
           const typeLabel = {
-            env_sensor:  'Environment Sensor',
-            pump:        'Water Pump Node',
-            rgb_display: 'RGB Display',
+            env_sensor:        'Environment Sensor',
+            environment_sensor:'Environment Sensor',
+            pump:              'Water Pump Node',
+            rgb_display:       'RGB Display',
           }[d.device_type] ?? d.device_type ?? '—';
+
+          const isEnv  = d.device_type === 'env_sensor' || d.device_type === 'environment_sensor';
+          const isPump = d.device_type === 'pump';
 
           return `
             <div class="device-card">
@@ -329,6 +389,8 @@
                   <span title="${d.last_seen ? new Date(d.last_seen).toLocaleString() : ''}">${relativeTime(d.last_seen)}</span>
                 </div>
               </div>
+              ${isEnv  ? renderEnvReadings(d)  : ''}
+              ${isPump ? renderPumpReadings(d) : ''}
             </div>
           `;
         }).join('');
@@ -382,6 +444,7 @@
         const friendly_name = document.getElementById('f-friendly-name').value.trim();
         const device_type  = document.getElementById('f-device-type').value;
         const room_name    = document.getElementById('f-room').value;
+        const has_ota      = document.getElementById('f-has-ota').checked;
 
         if (!device_id || !friendly_name) {
           errEl.textContent = 'Device ID and Friendly Name are required.';
@@ -393,7 +456,7 @@
           const resp = await fetch('/api/admin/devices', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ device_id, friendly_name, device_type, room_name }),
+            body: JSON.stringify({ device_id, friendly_name, device_type, room_name, has_ota }),
           });
           const result = await resp.json();
           if (!resp.ok) {

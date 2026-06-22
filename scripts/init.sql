@@ -11,7 +11,8 @@ CREATE TABLE IF NOT EXISTS devices (
   device_id    TEXT PRIMARY KEY,
   room_id      INTEGER REFERENCES rooms(id),
   friendly_name TEXT,
-  device_type  TEXT
+  device_type  TEXT,
+  has_ota      BOOLEAN NOT NULL DEFAULT false
 );
 
 CREATE TABLE IF NOT EXISTS watering_events (

@@ -93,4 +93,8 @@ export interface DeviceWithStatus {
   last_seen: Date | null;
   healthy: boolean;
   ota_available: boolean;
+  latest_env_readings: Record<string, number> | null;
+  latest_env_timestamp: Date | null;
+  latest_tank_reading: { gallons: number; pct_full: number; timestamp: Date } | null;
+  latest_pump_event: { status: string; action: string | null; timestamp: Date } | null;
 }

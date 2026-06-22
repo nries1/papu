@@ -698,20 +698,44 @@ export async function getDevicesWithStatus(): Promise<{
           (SELECT MAX(er.timestamp) FROM environment_readings er WHERE er.device_id = d.device_id),
           (SELECT MAX(tr.timestamp) FROM tank_readings tr        WHERE tr.device_id = d.device_id)
         ) AS last_seen,
-        EXISTS(
-          SELECT 1 FROM device_logs dl
-          WHERE dl.device_id = d.device_id
-            AND dl.timestamp > NOW() - INTERVAL '12 hours'
-        ) AS healthy,
         COALESCE(
           GREATEST(
             dp.last_boot,
             (SELECT MAX(dl.timestamp) FROM device_logs dl         WHERE dl.device_id = d.device_id),
             (SELECT MAX(er.timestamp) FROM environment_readings er WHERE er.device_id = d.device_id),
             (SELECT MAX(tr.timestamp) FROM tank_readings tr        WHERE tr.device_id = d.device_id)
-          ) > NOW() - INTERVAL '2 hours',
+          ) > NOW() - INTERVAL '12 hours',
           false
-        ) AS ota_available
+        ) AS healthy,
+        d.has_ota AS ota_available,
+        (
+          SELECT json_object_agg(e.metric, e.value)
+          FROM (
+            SELECT DISTINCT ON (er.readings->>'metric')
+              er.readings->>'metric' AS metric,
+              er.readings->'value'   AS value
+            FROM environment_readings er
+            WHERE er.device_id = d.device_id
+            ORDER BY er.readings->>'metric', er.timestamp DESC
+          ) e
+        ) AS latest_env_readings,
+        (SELECT MAX(er.timestamp) FROM environment_readings er WHERE er.device_id = d.device_id) AS latest_env_timestamp,
+        (
+          SELECT row_to_json(t) FROM (
+            SELECT gallons, pct_full, timestamp
+            FROM tank_readings
+            WHERE device_id = d.device_id
+            ORDER BY timestamp DESC LIMIT 1
+          ) t
+        ) AS latest_tank_reading,
+        (
+          SELECT row_to_json(w) FROM (
+            SELECT status, action, timestamp
+            FROM watering_events
+            WHERE device_id = d.device_id
+            ORDER BY timestamp DESC LIMIT 1
+          ) w
+        ) AS latest_pump_event
       FROM devices d
       LEFT JOIN rooms r           ON r.id          = d.room_id
       LEFT JOIN device_presence dp ON dp.device_id = d.device_id
@@ -726,11 +750,13 @@ export async function createDevice({
   friendly_name,
   device_type,
   room_name,
+  has_ota = false,
 }: {
   device_id: string;
   friendly_name: string;
   device_type: string;
   room_name: string;
+  has_ota?: boolean;
 }): Promise<{ success: boolean; dbError?: DbError }> {
   return tryMutate('createDevice', async () => {
     const room = await db
@@ -740,7 +766,7 @@ export async function createDevice({
       .executeTakeFirst();
     await db
       .insertInto('devices')
-      .values({ device_id, friendly_name, device_type, room_id: room?.id ?? null })
+      .values({ device_id, friendly_name, device_type, room_id: room?.id ?? null, has_ota })
       .execute();
   });
 }
