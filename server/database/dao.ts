@@ -725,12 +725,31 @@ export async function getDevicesWithStatus(): Promise<{
         (
           SELECT row_to_json(t) FROM (
             SELECT
-              ROUND(
-                (tr.pct_full / 100.0) *
-                COALESCE((d.config->>'tank_capacity_gallons')::numeric, 30),
-                1
-              ) AS gallons,
-              tr.pct_full,
+              tr.raw_value,
+              CASE
+                WHEN (d.config->>'calibration_raw')::numeric > 0
+                  AND (d.config->>'calibration_gallons')::numeric > 0
+                THEN ROUND(GREATEST(0, LEAST(
+                  COALESCE((d.config->>'tank_capacity_gallons')::numeric, 30),
+                  tr.raw_value
+                    * (d.config->>'calibration_gallons')::numeric
+                    / (d.config->>'calibration_raw')::numeric
+                )), 1)
+                ELSE ROUND(
+                  (tr.pct_full / 100.0) * COALESCE((d.config->>'tank_capacity_gallons')::numeric, 30), 1
+                )
+              END AS gallons,
+              CASE
+                WHEN (d.config->>'calibration_raw')::numeric > 0
+                  AND (d.config->>'calibration_gallons')::numeric > 0
+                THEN ROUND(GREATEST(0, LEAST(100,
+                  tr.raw_value
+                    * (d.config->>'calibration_gallons')::numeric
+                    / (d.config->>'calibration_raw')::numeric
+                    / COALESCE((d.config->>'tank_capacity_gallons')::numeric, 30) * 100
+                )), 1)
+                ELSE tr.pct_full
+              END AS pct_full,
               tr.timestamp
             FROM tank_readings tr
             WHERE tr.device_id = d.device_id
@@ -801,7 +820,7 @@ export async function updateDeviceConfig(
 ): Promise<{ success: boolean; dbError?: DbError }> {
   return tryMutate('updateDeviceConfig', async () => {
     await sql`
-      UPDATE devices SET config = config || ${JSON.stringify(patch)}::jsonb
+      UPDATE devices SET config = jsonb_strip_nulls(config || ${JSON.stringify(patch)}::jsonb)
       WHERE device_id = ${device_id}
     `.execute(db);
   });

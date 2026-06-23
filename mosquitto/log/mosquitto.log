@@ -102,3 +102,8 @@
 1782170370: Client mqttjs_67d20337 [172.20.0.3:51126] disconnected: connection closed by client.
 1782170371: New connection from 172.20.0.3:45148 on port 1883.
 1782170371: New client connected from 172.20.0.3:45148 as mqttjs_3d55baac (p4, c1, k60).
+1782171253: Client mqttjs_3d55baac [172.20.0.3:45148] disconnected: connection closed by client.
+1782171254: New connection from 172.20.0.3:43958 on port 1883.
+1782171254: New client connected from 172.20.0.3:43958 as mqttjs_5b8a9f6a (p4, c1, k60).
+1782172169: Saving in-memory database to /mosquitto/data//mosquitto.db.
+1782173970: Saving in-memory database to /mosquitto/data//mosquitto.db.

@@ -29,6 +29,8 @@ export interface WaterEventWithRoom {
 
 export interface DeviceConfig {
   tank_capacity_gallons?: number;
+  calibration_raw?: number;
+  calibration_gallons?: number;
 }
 
 export interface Device {
@@ -101,6 +103,6 @@ export interface DeviceWithStatus {
   config: DeviceConfig;
   latest_env_readings: Record<string, number> | null;
   latest_env_timestamp: Date | null;
-  latest_tank_reading: { gallons: number; pct_full: number; timestamp: Date } | null;
+  latest_tank_reading: { raw_value: number; gallons: number; pct_full: number; timestamp: Date } | null;
   latest_pump_event: { status: string; action: string | null; timestamp: Date } | null;
 }

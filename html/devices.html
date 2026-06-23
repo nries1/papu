@@ -292,6 +292,23 @@
           <label>Tank Capacity (gallons)</label>
           <input type="number" id="cfg-tank-capacity" min="1" max="10000" step="0.5" placeholder="30" />
         </div>
+        <div style="border-top:1px solid #334155;margin:16px 0 14px;"></div>
+        <div style="font-size:0.75rem;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-dim);margin-bottom:10px;">Sensor Calibration</div>
+        <div id="cfg-no-reading" style="display:none;font-size:0.8rem;color:var(--text-dim);margin-bottom:10px;">
+          No sensor reading yet — send one reading first, then calibrate.
+        </div>
+        <div id="cfg-calibration-fields">
+          <div style="font-size:0.8rem;color:var(--text-dim);margin-bottom:10px;">
+            Place the sensor in the tank, then enter how many gallons are currently in it. The system will use this as the calibration reference.
+          </div>
+          <div class="form-group">
+            <label>Current gallons in tank <span id="cfg-raw-hint" style="font-weight:400;text-transform:none;letter-spacing:0;"></span></label>
+            <input type="number" id="cfg-calibration-gallons" min="0" step="0.1" placeholder="e.g. 7" />
+          </div>
+          <div id="cfg-existing-calibration" style="font-size:0.75rem;color:var(--text-dim);margin-top:-6px;margin-bottom:10px;display:none;">
+            Current calibration: <span id="cfg-existing-calibration-text"></span> — <button onclick="clearCalibration()" style="background:none;border:none;color:#f87171;cursor:pointer;font-size:0.75rem;padding:0;">Clear</button>
+          </div>
+        </div>
         <div id="config-error-msg" style="color:var(--accent-red);font-size:0.8rem;margin-top:8px;display:none;"></div>
         <div class="form-actions">
           <button class="btn-cancel" id="close-config-modal">Cancel</button>
@@ -303,6 +320,7 @@
     <script>
       const grid = document.getElementById('devices-grid');
       let roomsCache = [];
+      const deviceMap = new Map();
 
       function relativeTime(ts) {
         if (!ts) return '—';
@@ -342,7 +360,7 @@
         if (!tank && !pump) return `
           <div class="tank-capacity-row">
             <span>Tank size: <strong style="color:var(--text-main);">${tankCapacity} gal</strong></span>
-            <button class="edit-capacity-btn" onclick="openConfigModal('${d.device_id}', ${tankCapacity})">Edit</button>
+            <button class="edit-capacity-btn" onclick="openConfigModal('${d.device_id}')">Edit</button>
           </div>`;
         let html = '<div style="margin-top:12px;padding-top:12px;border-top:1px solid #1e293b;display:grid;grid-template-columns:1fr 1fr;gap:10px 16px;">';
         if (tank) {
@@ -372,7 +390,7 @@
         html += `
           <div class="tank-capacity-row">
             <span>Tank size: <strong style="color:var(--text-main);">${tankCapacity} gal</strong></span>
-            <button class="edit-capacity-btn" onclick="openConfigModal('${d.device_id}', ${tankCapacity})">Edit</button>
+            <button class="edit-capacity-btn" onclick="openConfigModal('${d.device_id}')">Edit</button>
           </div>`;
         return html;
       }
@@ -382,6 +400,9 @@
           grid.innerHTML = '<div class="empty-state">No devices registered yet. Add one with the button above.</div>';
           return;
         }
+
+        deviceMap.clear();
+        devices.forEach(d => deviceMap.set(d.device_id, d));
 
         grid.innerHTML = devices.map(d => {
           const online  = d.healthy;
@@ -529,11 +550,44 @@
       let configDeviceId = null;
       const configOverlay = document.getElementById('config-modal-overlay');
 
-      function openConfigModal(device_id, currentCapacity) {
+      function openConfigModal(device_id) {
+        const d = deviceMap.get(device_id);
+        if (!d) return;
         configDeviceId = device_id;
-        document.getElementById('cfg-tank-capacity').value = currentCapacity;
+
+        const capacity = d.config?.tank_capacity_gallons ?? 30;
+        document.getElementById('cfg-tank-capacity').value = capacity;
         document.getElementById('config-error-msg').style.display = 'none';
+        document.getElementById('cfg-calibration-gallons').value = '';
+
+        const tank = d.latest_tank_reading;
+        const noReadingEl = document.getElementById('cfg-no-reading');
+        const calibFieldsEl = document.getElementById('cfg-calibration-fields');
+        const existingCalEl = document.getElementById('cfg-existing-calibration');
+
+        if (!tank) {
+          noReadingEl.style.display = 'block';
+          calibFieldsEl.style.display = 'none';
+        } else {
+          noReadingEl.style.display = 'none';
+          calibFieldsEl.style.display = 'block';
+          document.getElementById('cfg-raw-hint').textContent = `(raw=${tank.raw_value})`;
+
+          if (d.config?.calibration_raw && d.config?.calibration_gallons) {
+            existingCalEl.style.display = 'block';
+            document.getElementById('cfg-existing-calibration-text').textContent =
+              `${d.config.calibration_gallons} gal at raw=${d.config.calibration_raw}`;
+          } else {
+            existingCalEl.style.display = 'none';
+          }
+        }
+
         configOverlay.classList.add('open');
+      }
+
+      function clearCalibration() {
+        document.getElementById('cfg-calibration-gallons').value = '';
+        document.getElementById('cfg-existing-calibration').style.display = 'none';
       }
 
       document.getElementById('close-config-modal').addEventListener('click', () => {
@@ -547,17 +601,46 @@
       document.getElementById('save-config').addEventListener('click', async () => {
         const errEl = document.getElementById('config-error-msg');
         errEl.style.display = 'none';
-        const v = parseFloat(document.getElementById('cfg-tank-capacity').value);
-        if (!v || v <= 0) {
+
+        const capacity = parseFloat(document.getElementById('cfg-tank-capacity').value);
+        if (!capacity || capacity <= 0) {
           errEl.textContent = 'Enter a valid tank capacity.';
           errEl.style.display = 'block';
           return;
         }
+
+        const d = deviceMap.get(configDeviceId);
+        const tank = d?.latest_tank_reading;
+        const calibGallonsInput = document.getElementById('cfg-calibration-gallons').value.trim();
+        const existingCalibVisible = document.getElementById('cfg-existing-calibration').style.display !== 'none';
+
+        const patch = { tank_capacity_gallons: capacity };
+
+        if (tank && calibGallonsInput !== '') {
+          const calibGallons = parseFloat(calibGallonsInput);
+          if (isNaN(calibGallons) || calibGallons < 0) {
+            errEl.textContent = 'Enter a valid number of gallons for calibration.';
+            errEl.style.display = 'block';
+            return;
+          }
+          if (calibGallons > capacity) {
+            errEl.textContent = 'Calibration gallons cannot exceed tank capacity.';
+            errEl.style.display = 'block';
+            return;
+          }
+          patch.calibration_raw = tank.raw_value;
+          patch.calibration_gallons = calibGallons;
+        } else if (!existingCalibVisible && d?.config?.calibration_raw) {
+          // user cleared the existing calibration
+          patch.calibration_raw = null;
+          patch.calibration_gallons = null;
+        }
+
         try {
           const resp = await fetch(`/api/admin/devices/${configDeviceId}/config`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ tank_capacity_gallons: v }),
+            body: JSON.stringify(patch),
           });
           const result = await resp.json();
           if (!resp.ok) {

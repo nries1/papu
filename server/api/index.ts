@@ -369,12 +369,29 @@ app.patch('/api/admin/devices/:id/config', async (req, res) => {
   const body = req.body as Record<string, unknown>;
 
   const patch: Record<string, unknown> = {};
+
   if ('tank_capacity_gallons' in body) {
     const v = body['tank_capacity_gallons'];
     if (typeof v !== 'number' || v <= 0 || v > 10000) {
       return res.status(400).json({ error: 'tank_capacity_gallons must be a positive number ≤ 10000' });
     }
     patch['tank_capacity_gallons'] = v;
+  }
+
+  if ('calibration_raw' in body) {
+    const v = body['calibration_raw'];
+    if (v !== null && (typeof v !== 'number' || v < 0)) {
+      return res.status(400).json({ error: 'calibration_raw must be a non-negative number or null' });
+    }
+    patch['calibration_raw'] = v ?? null;
+  }
+
+  if ('calibration_gallons' in body) {
+    const v = body['calibration_gallons'];
+    if (v !== null && (typeof v !== 'number' || v < 0)) {
+      return res.status(400).json({ error: 'calibration_gallons must be a non-negative number or null' });
+    }
+    patch['calibration_gallons'] = v ?? null;
   }
 
   if (Object.keys(patch).length === 0) {

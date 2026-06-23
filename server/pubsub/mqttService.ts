@@ -90,22 +90,32 @@ client.on('message', async (topic: string, message: Buffer) => {
     await appLog({ message: 'MQTT water_level payload received', details: { topic, data }, source: 'mqttService', level: 'info' });
 
     const deviceId = data['device_id'] as string;
+    const rawValue = data['raw_value'] as number;
     const percentFull = data['percent_full'] as number;
     const config = await getDeviceConfig(deviceId);
     const tankCapacity = config.tank_capacity_gallons ?? 30;
-    const gallons = (percentFull / 100) * tankCapacity;
+
+    let gallons: number;
+    let calibratedPct: number;
+    if (config.calibration_raw && config.calibration_gallons && config.calibration_raw > 0) {
+      gallons = Math.max(0, Math.min(tankCapacity, rawValue * config.calibration_gallons / config.calibration_raw));
+      calibratedPct = (gallons / tankCapacity) * 100;
+    } else {
+      gallons = (percentFull / 100) * tankCapacity;
+      calibratedPct = percentFull;
+    }
 
     const appendRes = await appendWaterLevel({
       device_id: deviceId,
       gallons,
-      raw_value: data['raw_value'] as number,
-      percent_full: percentFull,
+      raw_value: rawValue,
+      percent_full: calibratedPct,
     });
 
     if (!appendRes.success) {
       await appLog({ message: 'Failed to persist tank reading', details: { device_id: deviceId, debugId: appendRes.dbError?.debugId }, source: 'mqttService', level: 'error' });
     } else {
-      await appLog({ message: `Tank level updated for ${deviceId}`, details: { gallons, pct_full: percentFull, tank_capacity: tankCapacity }, source: 'mqttService', level: 'info' });
+      await appLog({ message: `Tank level updated for ${deviceId}`, details: { gallons, pct_full: calibratedPct, tank_capacity: tankCapacity }, source: 'mqttService', level: 'info' });
     }
   }
 
