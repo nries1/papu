@@ -24,6 +24,30 @@
         </button>
       </div>
 
+      <!-- Service health cards -->
+      <div class="grid grid-cols-4 gap-4 mb-6">
+        <div id="svc-api" class="bg-slate-800/50 border border-slate-700 rounded-2xl p-5 flex flex-col items-center gap-2">
+          <span class="text-[10px] uppercase tracking-widest text-slate-500 font-bold">API</span>
+          <div class="svc-dot w-3 h-3 rounded-full bg-slate-600 transition-colors duration-300"></div>
+          <span class="svc-detail text-xs text-slate-500"></span>
+        </div>
+        <div id="svc-mqtt" class="bg-slate-800/50 border border-slate-700 rounded-2xl p-5 flex flex-col items-center gap-2">
+          <span class="text-[10px] uppercase tracking-widest text-slate-500 font-bold">MQTT</span>
+          <div class="svc-dot w-3 h-3 rounded-full bg-slate-600 transition-colors duration-300"></div>
+          <span class="svc-detail text-xs text-slate-500"></span>
+        </div>
+        <div id="svc-worker" class="bg-slate-800/50 border border-slate-700 rounded-2xl p-5 flex flex-col items-center gap-2">
+          <span class="text-[10px] uppercase tracking-widest text-slate-500 font-bold">Vision Worker</span>
+          <div class="svc-dot w-3 h-3 rounded-full bg-slate-600 transition-colors duration-300"></div>
+          <span class="svc-detail text-xs text-slate-500"></span>
+        </div>
+        <div id="svc-publisher" class="bg-slate-800/50 border border-slate-700 rounded-2xl p-5 flex flex-col items-center gap-2">
+          <span class="text-[10px] uppercase tracking-widest text-slate-500 font-bold">Publisher</span>
+          <div class="svc-dot w-3 h-3 rounded-full bg-slate-600 transition-colors duration-300"></div>
+          <span class="svc-detail text-xs text-slate-500"></span>
+        </div>
+      </div>
+
       <!-- System stats widget -->
       <div class="bg-slate-800/50 p-6 rounded-2xl border border-slate-700 flex flex-col space-y-6 mb-6">
         <div>
@@ -59,7 +83,6 @@
           <select id="filter-type" onchange="loadLogs()" class="bg-slate-900 border border-slate-700 text-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-cyan-500">
             <option value="">All Types</option>
             <option value="app">App</option>
-            <option value="api">API</option>
             <option value="db">DB</option>
             <option value="device">Hardware</option>
           </select>
@@ -87,6 +110,7 @@
               <th class="px-5 py-3">Level</th>
               <th class="px-5 py-3">Source</th>
               <th class="px-5 py-3">Message</th>
+              <th class="px-3 py-3"></th>
             </tr>
           </thead>
           <tbody id="log-body"></tbody>
@@ -123,7 +147,6 @@
 
       const typeBadge = {
         app:    'bg-emerald-900/60 text-emerald-300 border border-emerald-700',
-        api:    'bg-indigo-900/60 text-indigo-300 border border-indigo-700',
         db:     'bg-orange-900/60 text-orange-300 border border-orange-700',
         device: 'bg-cyan-900/60 text-cyan-300 border border-cyan-700',
       };
@@ -134,7 +157,7 @@
         error: 'bg-red-900/60 text-red-300 border border-red-700',
       };
 
-      const typeLabel = { app: 'App', api: 'API', db: 'DB', device: 'Hardware' };
+      const typeLabel = { app: 'App', db: 'DB', device: 'Hardware' };
 
       async function loadLogs() {
         currentPage = 0;
@@ -183,8 +206,9 @@
         tbody.innerHTML = '';
 
         logs.forEach(log => {
+          const hasDetails = log.details != null;
           const tr = document.createElement('tr');
-          tr.className = 'border-b border-slate-700/50 hover:bg-slate-700/30 transition';
+          tr.className = 'border-b border-slate-700/50 hover:bg-slate-700/30 transition' + (hasDetails ? ' cursor-pointer select-none' : '');
 
           const ts = new Date(log.timestamp);
           const timeStr = ts.toLocaleDateString() + ' ' + ts.toLocaleTimeString();
@@ -202,8 +226,26 @@
             </td>
             <td class="px-5 py-3 text-slate-400 whitespace-nowrap text-xs font-mono">${escHtml(log.source ?? '—')}</td>
             <td class="px-5 py-3 text-slate-300">${escHtml(log.message)}</td>
+            <td class="px-3 py-3 text-slate-600 text-xs text-right">${hasDetails ? '▶' : ''}</td>
           `;
           tbody.appendChild(tr);
+
+          if (hasDetails) {
+            const detailRow = document.createElement('tr');
+            detailRow.className = 'hidden border-b border-slate-700/50 bg-slate-950/60';
+            detailRow.innerHTML = `
+              <td colspan="6" class="px-5 py-4">
+                <pre class="text-xs text-slate-300 font-mono whitespace-pre-wrap break-all">${escHtml(JSON.stringify(log.details, null, 2))}</pre>
+              </td>
+            `;
+            tbody.appendChild(detailRow);
+
+            tr.addEventListener('click', () => {
+              const isOpen = !detailRow.classList.contains('hidden');
+              detailRow.classList.toggle('hidden');
+              tr.querySelector('td:last-child').textContent = isOpen ? '▶' : '▼';
+            });
+          }
         });
 
         document.getElementById('log-table').classList.remove('hidden');
@@ -234,6 +276,38 @@
           console.error('Stats update failed', e);
         }
       }
+
+      const dotColors = { ok: 'bg-emerald-400', stale: 'bg-amber-400', offline: 'bg-red-500' };
+
+      function setServiceTile(id, status, detail) {
+        const tile = document.getElementById(id);
+        const dot = tile.querySelector('.svc-dot');
+        const detailEl = tile.querySelector('.svc-detail');
+        dot.className = 'svc-dot w-3 h-3 rounded-full transition-colors duration-300 ' + (dotColors[status] || 'bg-slate-600');
+        detailEl.textContent = detail;
+      }
+
+      function formatAge(ms) {
+        if (ms === null) return 'never';
+        if (ms < 60000) return Math.round(ms / 1000) + 's ago';
+        return Math.round(ms / 60000) + 'm ago';
+      }
+
+      async function pollHealth() {
+        try {
+          const res = await fetch('/api/health');
+          const h = await res.json();
+          setServiceTile('svc-api', h.api === 'ok' ? 'ok' : 'offline', h.api === 'ok' ? 'responding' : 'unreachable');
+          setServiceTile('svc-mqtt', h.mqtt, h.mqtt === 'ok' ? 'broker connected' : 'broker offline');
+          setServiceTile('svc-worker', h.visionWorker.status, h.visionWorker.lastSeenMs === null ? 'no results yet' : 'last result ' + formatAge(h.visionWorker.lastSeenMs));
+          setServiceTile('svc-publisher', h.publisher.status, h.publisher.lastSeenMs === null ? 'no frames yet' : 'last frame ' + formatAge(h.publisher.lastSeenMs));
+        } catch {
+          setServiceTile('svc-api', 'offline', 'unreachable');
+        }
+      }
+
+      pollHealth();
+      setInterval(pollHealth, 15000);
 
       loadLogs();
       updateStats();

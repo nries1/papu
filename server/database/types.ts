@@ -71,6 +71,7 @@ export interface SystemLog {
   log_level: string;
   message: string;
   source: string | null;
+  details: unknown;
   timestamp: Date;
 }
 

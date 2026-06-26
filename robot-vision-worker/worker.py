@@ -208,9 +208,12 @@ def processing_loop(client: mqtt.Client) -> None:
             log.error("Frame processing error: %s", e)
 
 
+_disconnect_event = threading.Event()
+
 def on_disconnect(client, userdata, rc):
     if rc != 0:
         log.warning("Unexpected MQTT disconnect, rc=%d", rc)
+    _disconnect_event.set()
 
 
 # ---------------------------------------------------------------------------
@@ -229,11 +232,16 @@ def main():
 
     while True:
         try:
+            _disconnect_event.clear()
             client.connect(MQTT_HOST, MQTT_PORT, keepalive=60)
-            client.loop_forever()
+            client.loop_start()
+            _disconnect_event.wait()  # blocks until on_disconnect fires
+            client.loop_stop()
         except Exception as e:
             log.error("Connection error: %s — retrying in 5s", e)
-            time.sleep(5)
+            client.loop_stop()
+        log.warning("MQTT loop exited — retrying in 5s")
+        time.sleep(5)
 
 
 if __name__ == "__main__":

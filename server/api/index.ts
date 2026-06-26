@@ -5,7 +5,8 @@ import path from 'path';
 import crypto from 'crypto';
 import si from 'systeminformation';
 import axios from 'axios';
-import { publishWaterCommand, visionListeners } from '../pubsub/mqttService';
+import { ollamaChat } from './ollama';
+import { publishWaterCommand, visionListeners, serviceStatus } from '../pubsub/mqttService';
 import { startHourlySummary } from '../aiSummaries/aiSummaryService';
 import { authMiddleware, ADMIN_EMAILS } from './auth';
 import SHARED from '../../shared/plant_config.json';
@@ -108,6 +109,27 @@ function weatherCodeToText(code: number): string {
 }
 
 // ── Public routes (before authMiddleware) ─────────────────────────────────────
+
+app.get('/api/health', (_req, res) => {
+  const now = Date.now();
+  const staleMs = 30_000;
+  const serviceAge = (d: Date | null) => d ? now - d.getTime() : null;
+  const serviceState = (d: Date | null) =>
+    d === null ? 'offline' : now - d.getTime() < staleMs ? 'ok' : 'stale';
+
+  return res.status(200).json({
+    api: 'ok',
+    mqtt: serviceStatus.mqttConnected ? 'ok' : 'offline',
+    visionWorker: {
+      status: serviceState(serviceStatus.lastVisionResult),
+      lastSeenMs: serviceAge(serviceStatus.lastVisionResult),
+    },
+    publisher: {
+      status: serviceState(serviceStatus.lastPublisherFrame),
+      lastSeenMs: serviceAge(serviceStatus.lastPublisherFrame),
+    },
+  });
+});
 
 app.get('/api/config', (_req, res) => {
   return res.status(200).json({
@@ -627,12 +649,9 @@ app.post('/api/chat', async (req, res) => {
   messages.push({ role: 'user', content: message });
 
   try {
-    const response = await axios.post<{ message: { content: string } }>(
-      process.env.OLLAMA_URL ?? 'http://ollama:11434/api/chat',
-      { model: 'llama3.2', messages, stream: false }
-    );
-    res.json({ reply: response.data.message.content });
-  } catch (err) {
+    const reply = await ollamaChat(messages);
+    res.json({ reply });
+  } catch {
     return res.status(400).json({ error: 'The AI is currently offline.' });
   }
 });

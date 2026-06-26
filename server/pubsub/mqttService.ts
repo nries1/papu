@@ -24,7 +24,14 @@ const client = mqtt.connect(process.env.MQTT_BROKER_URL || 'mqtt://mqtt-broker:1
 const commandQueue: WaterCommandPayload[] = [];
 export const visionListeners = new Set<Response>();
 
+export const serviceStatus = {
+  mqttConnected: false,
+  lastVisionResult: null as Date | null,
+  lastPublisherFrame: null as Date | null,
+};
+
 client.on('connect', async () => {
+  serviceStatus.mqttConnected = true;
   await appLog({ message: 'Connected to MQTT Broker', source: 'mqttService', level: 'info' });
 
   const topics: string[] = [
@@ -37,6 +44,7 @@ client.on('connect', async () => {
     SHARED.device_logs_topic,
     SHARED.device_boot_topic,
     'robot/vision/result',
+    'robot/vision/tracking',
   ];
 
   for (const topic of topics) {
@@ -120,6 +128,7 @@ client.on('message', async (topic: string, message: Buffer) => {
   }
 
   if (topic === 'robot/vision/result') {
+    serviceStatus.lastVisionResult = new Date();
     for (const res of visionListeners) {
       try {
         res.write(`data: ${messageStr}\n\n`);
@@ -127,6 +136,10 @@ client.on('message', async (topic: string, message: Buffer) => {
         visionListeners.delete(res);
       }
     }
+  }
+
+  if (topic === 'robot/vision/tracking') {
+    serviceStatus.lastPublisherFrame = new Date();
   }
 
   if (topic === SHARED.device_logs_topic) {
@@ -179,6 +192,7 @@ client.on('reconnect', async () => {
 });
 
 client.on('offline', async () => {
+  serviceStatus.mqttConnected = false;
   await appLog({ message: 'MQTT client went offline', source: 'mqttService', level: 'warn' });
 });
 

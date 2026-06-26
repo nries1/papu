@@ -47,20 +47,12 @@ interface EnvironmentReadingsTable {
 
 interface ApiLogsTable {
   id: Generated<number>;
-  request_id: string | null;
-  user_email: string | null;
-  request_method: string | null;
-  request_path: string | null;
+  path: string | null;
   request_body: JsonbNullable;
-  response_code: number | null;
+  status_code: number | null;
   response_body: JsonbNullable;
   response_time_ms: number | null;
-  error_message: string | null;
-  client_ip: string | null;
-  user_agent: string | null;
   timestamp: Generated<Date>;
-  request_url: string | null;
-  level: string | null;
 }
 
 interface AppLogsTable {

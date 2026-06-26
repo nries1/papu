@@ -3,7 +3,7 @@ config.h
 .env
 
 # SSH keys that Ollama generates at runtime
-data/ollama/id_ed25519*
+ollama/id_ed25519*
 *id_ed25519*
 secure-private-storage/
 models
@@ -12,7 +12,7 @@ mosquitto.db
 # Robot vision — face encodings are runtime data, not source
 robot-vision-worker/known_faces/*.pkl
 
-data/
+ollama/
 
 .venv
 

@@ -377,24 +377,15 @@ export async function getLatestEnvironmentReading(
 const API_LOG_MAX_ROWS = parseInt(process.env.API_LOG_MAX_ROWS ?? '50000', 10);
 
 async function appendApiLog({ req, res }: { req: Request; res: Response }): Promise<void> {
-  const isError = res.statusCode >= 400;
   const body = res.locals.responseBody as Record<string, unknown> | undefined;
   await db
     .insertInto('api_logs')
     .values({
-      request_id: req.requestId ?? null,
-      user_email: req.userEmail ?? null,
-      request_method: req.method,
-      request_path: req.path ?? req.originalUrl,
+      path: req.path ?? req.originalUrl,
       request_body: req.body != null ? JSON.stringify(req.body) : null,
-      response_code: res.statusCode ?? null,
+      status_code: res.statusCode ?? null,
       response_body: body != null ? JSON.stringify(body) : null,
       response_time_ms: req.startTime ? Date.now() - req.startTime : null,
-      error_message: isError && body?.['error'] ? String(body['error']) : null,
-      client_ip: req.ip ?? null,
-      user_agent: (req.headers['user-agent'] as string) ?? null,
-      request_url: req.url,
-      level: isError ? 'error' : 'info',
     })
     .execute();
 
@@ -526,19 +517,12 @@ export async function getSystemLogs({
   return tryRows('getSystemLogs', async () => {
     const result = await sql<SystemLog>`
       SELECT * FROM (
-        SELECT 'app'    AS log_type, log_level, message, source, timestamp FROM app_logs
+        SELECT 'app'    AS log_type, log_level, message, source, details, timestamp FROM app_logs
         UNION ALL
-        SELECT 'db'     AS log_type, log_level, message, source, timestamp FROM db_logs
-        UNION ALL
-        SELECT 'api'    AS log_type,
-               COALESCE(level, 'info') AS log_level,
-               request_method || ' ' || request_path AS message,
-               COALESCE(user_email, client_ip::text, 'unknown') AS source,
-               timestamp
-        FROM api_logs
+        SELECT 'db'     AS log_type, log_level, message, source, details, timestamp FROM db_logs
         UNION ALL
         SELECT 'device' AS log_type, dl.log_level, dl.message,
-               COALESCE(d.friendly_name, dl.device_id) AS source, dl.timestamp
+               COALESCE(d.friendly_name, dl.device_id) AS source, dl.details, dl.timestamp
         FROM device_logs dl
         LEFT JOIN devices d ON d.device_id = dl.device_id
       ) AS logs

@@ -590,9 +590,16 @@
 
   function startPublishing() {
     // Fast path: local MediaPipe detection for pan/tilt at 10fps
+    // Guard prevents concurrent send() calls — WASM is not re-entrant
+    let detecting = false;
     setInterval(async () => {
-      if (videoEl.readyState < 2) return;
-      await faceDetection.send({ image: videoEl });
+      if (videoEl.readyState < 2 || detecting) return;
+      detecting = true;
+      try {
+        await faceDetection.send({ image: videoEl });
+      } finally {
+        detecting = false;
+      }
     }, 100);
 
     // Slow path: publish frames to GPU worker for name/confidence at 3fps
