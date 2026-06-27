@@ -82,6 +82,22 @@ services:
               count: 1
               capabilities: [gpu]
 
+  kokoro:
+    image: ghcr.io/remsky/kokoro-fastapi-gpu:v0.2.1
+    container_name: kokoro
+    profiles: ['gpu']
+    runtime: nvidia
+    volumes:
+      - kokoro-voices:/app/api/src/voices
+    restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
   robot-vision-worker:
     build:
       context: ./robot-vision-worker
@@ -107,4 +123,6 @@ services:
 
 volumes:
   postgres_data:
+    driver: local
+  kokoro-voices:
     driver: local

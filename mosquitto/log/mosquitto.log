@@ -901,3 +901,47 @@
 1782582745: New connection from 172.18.0.3:58042 on port 9001.
 1782582745: New client connected from 172.18.0.3:58042 as mqttjs_97b08f68 (p4, c1, k60).
 1782582754: Client mqttjs_97b08f68 [172.18.0.3:58042] disconnected: connection closed by client.
+1782582928: New connection from 172.18.0.3:51966 on port 9001.
+1782582928: New client connected from 172.18.0.3:51966 as mqttjs_9c0b8992 (p4, c1, k60).
+1782583116: Saving in-memory database to /mosquitto/data//mosquitto.db.
+1782583136: Client mqttjs_673b5460 [172.18.0.5:41680] disconnected: connection closed by client.
+1782583137: New connection from 172.18.0.5:52026 on port 1883.
+1782583137: New client connected from 172.18.0.5:52026 as mqttjs_da839882 (p4, c1, k60).
+1782583232: Client mqttjs_9c0b8992 [172.18.0.3:51966] disconnected: connection closed by client.
+1782583233: New connection from 172.18.0.3:36200 on port 9001.
+1782583233: New client connected from 172.18.0.3:36200 as mqttjs_9c0b8992 (p4, c1, k60).
+1782583324: Client mqttjs_9c0b8992 [172.18.0.3:36200] disconnected: exceeded timeout.
+1782583648: New connection from 172.18.0.3:39168 on port 9001.
+1782583648: New client connected from 172.18.0.3:39168 as mqttjs_9c0b8992 (p4, c1, k60).
+1782583739: Client mqttjs_9c0b8992 [172.18.0.3:39168] disconnected: exceeded timeout.
+1782584401: New connection from 172.18.0.3:47404 on port 9001.
+1782584401: New client connected from 172.18.0.3:47404 as mqttjs_9c0b8992 (p4, c1, k60).
+1782584492: Client mqttjs_9c0b8992 [172.18.0.3:47404] disconnected: exceeded timeout.
+1782584917: Saving in-memory database to /mosquitto/data//mosquitto.db.
+1782585749: New connection from 172.18.0.3:54564 on port 9001.
+1782585749: New client connected from 172.18.0.3:54564 as mqttjs_9c0b8992 (p4, c1, k60).
+1782585840: Client mqttjs_9c0b8992 [172.18.0.3:54564] disconnected: exceeded timeout.
+1782586718: Saving in-memory database to /mosquitto/data//mosquitto.db.
+1782588519: Saving in-memory database to /mosquitto/data//mosquitto.db.
+1782588944: New connection from 172.18.0.3:41712 on port 9001.
+1782588944: New client connected from 172.18.0.3:41712 as mqttjs_9c0b8992 (p4, c1, k60).
+1782589035: Client mqttjs_9c0b8992 [172.18.0.3:41712] disconnected: exceeded timeout.
+1782589174: New connection from 172.18.0.3:42264 on port 9001.
+1782589174: New client connected from 172.18.0.3:42264 as mqttjs_9c0b8992 (p4, c1, k60).
+1782589182: Client mqttjs_9c0b8992 [172.18.0.3:42264] disconnected: connection closed by client.
+1782589182: New connection from 172.18.0.3:34142 on port 9001.
+1782589182: New client connected from 172.18.0.3:34142 as mqttjs_4dec6a14 (p4, c1, k60).
+1782589417: Client mqttjs_4dec6a14 [172.18.0.3:34142] disconnected: connection closed by client.
+1782589418: New connection from 172.18.0.3:35274 on port 9001.
+1782589418: New client connected from 172.18.0.3:35274 as mqttjs_4dec6a14 (p4, c1, k60).
+1782589509: Client mqttjs_4dec6a14 [172.18.0.3:35274] disconnected: exceeded timeout.
+1782589510: New connection from 172.18.0.3:56698 on port 9001.
+1782589510: New client connected from 172.18.0.3:56698 as mqttjs_4dec6a14 (p4, c1, k60).
+1782590320: Saving in-memory database to /mosquitto/data//mosquitto.db.
+1782590349: Client mqttjs_4dec6a14 [172.18.0.3:56698] disconnected: connection closed by client.
+1782590349: New connection from 172.18.0.3:54772 on port 9001.
+1782590349: New client connected from 172.18.0.3:54772 as mqttjs_f7524906 (p4, c1, k60).
+1782590352: Client mqttjs_f7524906 [172.18.0.3:54772] disconnected: connection closed by client.
+1782590352: New connection from 172.18.0.3:54782 on port 9001.
+1782590352: New client connected from 172.18.0.3:54782 as mqttjs_46d5dc5a (p4, c1, k60).
+1782590355: Client mqttjs_46d5dc5a [172.18.0.3:54782] disconnected: connection closed by client.

@@ -426,21 +426,12 @@
   // -------------------------------------------------------------------------
   // TTS + mouth animation
   // -------------------------------------------------------------------------
-  function robotSpeak(text) {
-    if (mouthTimer) { clearInterval(mouthTimer); mouthTimer = null; }
-    speechSynthesis.cancel();
+  let currentAudio = null;
 
-    robotTextEl.textContent = text;
-    transcriptEl.style.display = 'flex';
-
-    setVoiceState('speaking');
-
-    const utter = new SpeechSynthesisUtterance(text);
-    utter.rate  = 1.0;
-    utter.pitch = 1.0;
-
+  function startMouthAnimation(isDoneFn) {
+    if (mouthTimer) clearInterval(mouthTimer);
     mouthTimer = setInterval(() => {
-      if (!speechSynthesis.speaking) {
+      if (isDoneFn()) {
         clearInterval(mouthTimer);
         mouthTimer = null;
         mouth.setAttribute('width', '10');
@@ -449,8 +440,49 @@
       }
       mouth.setAttribute('width', String(Math.round(12 + Math.random() * 70)));
     }, 90);
+  }
 
-    speechSynthesis.speak(utter);
+  async function robotSpeak(text) {
+    if (mouthTimer) { clearInterval(mouthTimer); mouthTimer = null; }
+    if (currentAudio) { currentAudio.pause(); currentAudio = null; }
+    speechSynthesis.cancel();
+
+    robotTextEl.textContent = text;
+    transcriptEl.style.display = 'flex';
+    setVoiceState('speaking');
+
+    try {
+      const res = await fetch('/api/tts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text }),
+      });
+      if (!res.ok) throw new Error(`TTS ${res.status}`);
+
+      const blob = await res.blob();
+      const url  = URL.createObjectURL(blob);
+      const audio = new Audio(url);
+      currentAudio = audio;
+
+      audio.onended = () => {
+        if (mouthTimer) { clearInterval(mouthTimer); mouthTimer = null; }
+        mouth.setAttribute('width', '10');
+        setVoiceState('idle');
+        URL.revokeObjectURL(url);
+        if (currentAudio === audio) currentAudio = null;
+      };
+
+      startMouthAnimation(() => audio.ended || audio.paused && audio.currentTime === 0);
+      await audio.play();
+    } catch (e) {
+      // Fallback to browser TTS if Kokoro is unavailable
+      console.warn('Kokoro TTS unavailable, using browser TTS:', e.message);
+      const utter = new SpeechSynthesisUtterance(text);
+      utter.rate  = 1.0;
+      utter.pitch = 1.0;
+      startMouthAnimation(() => !speechSynthesis.speaking);
+      speechSynthesis.speak(utter);
+    }
   }
 
   // -------------------------------------------------------------------------

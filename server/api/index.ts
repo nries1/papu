@@ -662,6 +662,28 @@ app.post('/api/admin/upload', upload.single('file'), async (req, res) => {
   return res.redirect('/photo-gallery.html');
 });
 
+// ── TTS ───────────────────────────────────────────────────────────────────────
+
+const KOKORO_URL = process.env.KOKORO_URL || 'http://kokoro:8880';
+const TTS_VOICE  = process.env.TTS_VOICE  || 'af_bella';
+
+app.post('/api/tts', async (req, res) => {
+  const { text, voice } = req.body as { text?: string; voice?: string };
+  if (!text?.trim()) return res.status(400).json({ error: 'text is required' });
+  try {
+    const ttsRes = await axios.post(
+      `${KOKORO_URL}/v1/audio/speech`,
+      { model: 'kokoro', input: text.trim(), voice: voice || TTS_VOICE, response_format: 'mp3', speed: 1.0 },
+      { responseType: 'arraybuffer', timeout: 20000 }
+    );
+    res.set('Content-Type', 'audio/mpeg');
+    res.set('Cache-Control', 'no-store');
+    res.send(Buffer.from(ttsRes.data as ArrayBuffer));
+  } catch {
+    res.status(503).json({ error: 'TTS service unavailable' });
+  }
+});
+
 // ── Chat session endpoints ─────────────────────────────────────────────────────
 
 app.post('/api/chat/session', async (req, res) => {
