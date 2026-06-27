@@ -20,8 +20,10 @@ ollama/
 server/dist/
 
 LAUNCH.md
+robot.md
 
 **/.pio/
 
 ota_err.txt
 ota_out.txt
+mosquitto/log/mosquitto.log

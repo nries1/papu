@@ -6,7 +6,9 @@ import crypto from 'crypto';
 import si from 'systeminformation';
 import axios from 'axios';
 import { ollamaChat } from './ollama';
-import { publishWaterCommand, visionListeners, serviceStatus } from '../pubsub/mqttService';
+import { runChatTurn, buildSystemPrompt, summarizeSessionAsync } from './chatContext';
+import { getCoverage, generateQuestions, processAnswers } from './homeKnowledgeOnboarding';
+import { publishWaterCommand, publishLearnFrame, visionListeners, serviceStatus } from '../pubsub/mqttService';
 import { startHourlySummary } from '../aiSummaries/aiSummaryService';
 import { authMiddleware, ADMIN_EMAILS } from './auth';
 import SHARED from '../../shared/plant_config.json';
@@ -34,6 +36,15 @@ import {
   createDevice,
   getDeviceConfig,
   updateDeviceConfig,
+  createChatSession,
+  getChatSession,
+  getChatMessages,
+  getAllHomeKnowledge,
+  insertHomeKnowledge,
+  updateHomeKnowledge,
+  deleteHomeKnowledge,
+  getVisionPeople,
+  upsertVisionPerson,
 } from '../database/dao';
 
 const app = express();
@@ -249,6 +260,15 @@ const UPLOAD_MAX_MB = parseInt(process.env.UPLOAD_MAX_MB ?? '20', 10);
 const upload = multer({
   storage,
   limits: { fileSize: UPLOAD_MAX_MB * 1024 * 1024 },
+});
+
+const enrollUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 20 * 1024 * 1024, files: 20 },
+  fileFilter: (_req, file, cb) => {
+    if (/image\//i.test(file.mimetype)) cb(null, true);
+    else cb(new Error('Only image files are accepted'));
+  },
 });
 
 // ── Protected routes ──────────────────────────────────────────────────────────
@@ -642,18 +662,149 @@ app.post('/api/admin/upload', upload.single('file'), async (req, res) => {
   return res.redirect('/photo-gallery.html');
 });
 
+// ── Chat session endpoints ─────────────────────────────────────────────────────
+
+app.post('/api/chat/session', async (req, res) => {
+  const { sessionKey, prevSessionKey } = req.body as {
+    sessionKey: string;
+    prevSessionKey?: string;
+  };
+  if (!sessionKey || typeof sessionKey !== 'string') {
+    return res.status(400).json({ error: 'sessionKey required' });
+  }
+  await createChatSession(sessionKey);
+  if (prevSessionKey && typeof prevSessionKey === 'string') {
+    summarizeSessionAsync(prevSessionKey);
+  }
+  res.json({ ok: true });
+});
+
+app.get('/api/chat/session/:key', async (req, res) => {
+  const { key } = req.params;
+  const [session, messages] = await Promise.all([
+    getChatSession(key),
+    getChatMessages(key),
+  ]);
+  if (!session.row) return res.status(404).json({ error: 'session not found' });
+  res.json({
+    session: session.row,
+    messages: messages.map((m) => ({ role: m.role, content: m.content, timestamp: m.timestamp })),
+  });
+});
+
 app.post('/api/chat', async (req, res) => {
-  const { message, system } = req.body as { message: string; system?: string };
-  const messages: Array<{ role: string; content: string }> = [];
-  if (system) messages.push({ role: 'system', content: system });
-  messages.push({ role: 'user', content: message });
+  const { sessionKey, message, personName } = req.body as {
+    sessionKey?: string;
+    message: string;
+    personName?: string | null;
+  };
+
+  // Legacy path: no sessionKey, build a one-shot context from the old system param
+  if (!sessionKey) {
+    const { system } = req.body as { system?: string };
+    const msgs: Array<{ role: string; content: string }> = [];
+    if (system) msgs.push({ role: 'system', content: system });
+    msgs.push({ role: 'user', content: message });
+    try {
+      const reply = await ollamaChat(msgs);
+      return res.json({ reply });
+    } catch {
+      return res.status(400).json({ error: 'The AI is currently offline.' });
+    }
+  }
 
   try {
-    const reply = await ollamaChat(messages);
+    const reply = await runChatTurn(sessionKey, message, personName ?? null);
     res.json({ reply });
   } catch {
     return res.status(400).json({ error: 'The AI is currently offline.' });
   }
+});
+
+app.get('/api/chat/context', async (req, res) => {
+  const personName = (req.query.person as string) || null;
+  try {
+    const systemPrompt = await buildSystemPrompt(personName);
+    res.json({ systemPrompt });
+  } catch {
+    res.status(500).json({ error: 'failed to build context' });
+  }
+});
+
+// ── Home knowledge endpoints ───────────────────────────────────────────────────
+
+app.get('/api/home-knowledge/coverage', async (_req, res) => {
+  try {
+    res.json(await getCoverage());
+  } catch {
+    res.status(500).json({ error: 'failed to compute coverage' });
+  }
+});
+
+app.post('/api/home-knowledge/questions', async (_req, res) => {
+  try {
+    const questions = await generateQuestions();
+    res.json({ questions });
+  } catch {
+    res.status(500).json({ error: 'failed to generate questions' });
+  }
+});
+
+app.post('/api/home-knowledge/answers', async (req, res) => {
+  const { pairs } = req.body as {
+    pairs: Array<{ question: string; subject: string; category: string; answer: string }>;
+  };
+  if (!Array.isArray(pairs)) return res.status(400).json({ error: 'pairs array required' });
+  const filled = pairs.filter((p) => p.answer?.trim());
+  if (!filled.length) return res.json({ saved: 0, facts: [] });
+  try {
+    const result = await processAnswers(filled);
+    res.json(result);
+  } catch {
+    res.status(500).json({ error: 'failed to process answers' });
+  }
+});
+
+app.get('/api/home-knowledge', async (_req, res) => {
+  const rows = await getAllHomeKnowledge();
+  res.json(rows);
+});
+
+app.post('/api/home-knowledge', async (req, res) => {
+  const { subject, category, fact } = req.body as {
+    subject: string;
+    category: string;
+    fact: string;
+  };
+  if (!subject || !category || !fact) {
+    return res.status(400).json({ error: 'subject, category, and fact are required' });
+  }
+  const result = await insertHomeKnowledge(subject, category, fact);
+  if (!result.success) return res.status(500).json({ error: 'db error' });
+  res.json({ id: result.id });
+});
+
+app.put('/api/home-knowledge/:id', async (req, res) => {
+  const id = parseInt(req.params.id);
+  const { subject, category, fact } = req.body as {
+    subject: string;
+    category: string;
+    fact: string;
+  };
+  if (!subject || !category || !fact) {
+    return res.status(400).json({ error: 'subject, category, and fact are required' });
+  }
+  const result = await updateHomeKnowledge(id, subject, category, fact);
+  if (!result.success) return res.status(500).json({ error: 'db error' });
+  res.json({ ok: true });
+});
+
+app.delete('/api/home-knowledge/:id', async (req, res) => {
+  const id = parseInt(req.params.id);
+  if (isNaN(id)) return res.status(400).json({ error: 'invalid id' });
+  const result = await deleteHomeKnowledge(id);
+  if (!result.success) return res.status(500).json({ error: 'db error' });
+  res.json({ ok: true });
 });
 
 app.get('/api/list-images', (req, res) => {
@@ -809,6 +960,34 @@ app.get('/api/system-logs', async (req, res) => {
       .json({ error: dbError!.name, debugId: dbError!.debugId });
   }
   return res.status(200).json(logs);
+});
+
+// ── Vision people endpoints ───────────────────────────────────────────────────
+
+app.get('/api/vision/people', async (_req, res) => {
+  const people = await getVisionPeople();
+  res.json(people);
+});
+
+app.post('/api/vision/enroll', enrollUpload.array('photos', 20), async (req, res) => {
+  const name = (req.body as { name?: string }).name?.trim();
+  if (!name) return res.status(400).json({ error: 'name is required' });
+
+  const files = req.files as Express.Multer.File[] | undefined;
+  if (!files || files.length === 0) return res.status(400).json({ error: 'at least one photo is required' });
+
+  if (!serviceStatus.mqttConnected) {
+    return res.status(503).json({ error: 'MQTT broker is offline' });
+  }
+
+  let published = 0;
+  for (const file of files) {
+    const b64 = file.buffer.toString('base64');
+    if (publishLearnFrame(name, b64)) published++;
+  }
+
+  await upsertVisionPerson(name, published);
+  res.json({ enrolled: published, total: files.length });
 });
 
 // ── Boot ──────────────────────────────────────────────────────────────────────

@@ -357,9 +357,9 @@
   const greetedAt = {};
 
   function setPose(pan, tilt) {
-    head.style.transform = `rotateY(${pan * 60}deg) rotateX(${-tilt * 40}deg)`;
-    eyeL.style.transform = `translate(${pan * 10}px, ${tilt * 7}px)`;
-    eyeR.style.transform = `translate(${pan * 10}px, ${tilt * 7}px)`;
+    head.style.transform = `rotateY(${-pan * 60}deg) rotateX(${-tilt * 40}deg)`;
+    eyeL.style.transform = `translate(${-pan * 10}px, ${tilt * 7}px)`;
+    eyeR.style.transform = `translate(${-pan * 10}px, ${tilt * 7}px)`;
   }
 
   // Fast path: local Haar detection → head pose only
@@ -454,22 +454,53 @@
   }
 
   // -------------------------------------------------------------------------
+  // Session management (Layer 1 + 2)
+  // -------------------------------------------------------------------------
+  let sessionKey = sessionStorage.getItem('papu-session-key');
+
+  async function initSession() {
+    if (sessionKey) return; // already have a session for this tab
+
+    sessionKey = crypto.randomUUID();
+    sessionStorage.setItem('papu-session-key', sessionKey);
+
+    const prevSessionKey = localStorage.getItem('papu-last-session-key');
+    localStorage.setItem('papu-last-session-key', sessionKey);
+
+    await fetch('/api/chat/session', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionKey, prevSessionKey }),
+    }).catch(() => {});
+  }
+
+  async function loadSessionHistory() {
+    if (!sessionKey) return;
+    try {
+      const res = await fetch(`/api/chat/session/${sessionKey}`);
+      if (!res.ok) return;
+      const data = await res.json();
+      for (const msg of data.messages) {
+        if (msg.role === 'user') appendChat('chat-you', 'you', msg.content);
+        else appendChat('chat-robot', 'papu', msg.content);
+      }
+    } catch {}
+  }
+
+  // -------------------------------------------------------------------------
   // LLM
   // -------------------------------------------------------------------------
   async function askLLM(userText) {
     setVoiceState('thinking');
-
-    const who = lastRecognizedName
-      ? `You are looking at ${lastRecognizedName}, a member of the household.`
-      : 'You cannot identify the person in front of you.';
-
-    const system = `You are Papu, a friendly home robot assistant. ${who} Reply in 1–2 short sentences. Be warm and natural.`;
-
     try {
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: userText, system }),
+        body: JSON.stringify({
+          sessionKey,
+          message: userText,
+          personName: lastRecognizedName,
+        }),
       });
       const data = await res.json();
       robotSpeak(data.reply || "Sorry, I couldn't think of a response.");
@@ -639,10 +670,10 @@
       const res  = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message }),
+        body: JSON.stringify({ sessionKey, message, personName: lastRecognizedName }),
       });
       const data = await res.json();
-      appendChat('chat-robot', 'papus', data.reply || data.error || 'No response.');
+      appendChat('chat-robot', 'papu', data.reply || data.error || 'No response.');
     } catch {
       const err = document.createElement('div');
       err.className   = 'chat-err';
@@ -654,17 +685,21 @@
   document.getElementById('chat-send').addEventListener('click', sendChat);
   chatInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') sendChat(); });
 
-  // Load AI summary as first chat message
+  // Boot sequence: init session, load config, load history
   (async () => {
-    await Promise.all([loadConfig(), loadDisplayNames()]);
-    try {
-      const res  = await fetch('/api/ai-summary');
-      if (!res.ok) throw new Error();
-      const data = await res.json();
-      const ts   = new Date(data.timestamp).toLocaleString();
-      appendChat('chat-robot', `papus (${ts})`, data.summary.replace(/\n/g, ' '));
-    } catch {
-      appendChat('chat-robot', 'papus', config.aiPlaceholder || 'How can I help?');
+    await Promise.all([loadConfig(), loadDisplayNames(), initSession()]);
+    const historyLoaded = await loadSessionHistory().then(() => true).catch(() => false);
+    // Only show greeting if this is a fresh session with no prior history
+    if (!historyLoaded || chatLog.children.length === 0) {
+      try {
+        const res  = await fetch('/api/ai-summary');
+        if (!res.ok) throw new Error();
+        const data = await res.json();
+        const ts   = new Date(data.timestamp).toLocaleString();
+        appendChat('chat-robot', `papu (${ts})`, data.summary.replace(/\n/g, ' '));
+      } catch {
+        appendChat('chat-robot', 'papu', config.aiPlaceholder || 'How can I help?');
+      }
     }
   })();
 </script>

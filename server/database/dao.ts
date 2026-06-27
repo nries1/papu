@@ -17,6 +17,10 @@ import type {
   SensorHealthMetrics,
   DailyStdDev,
   DeviceWithStatus,
+  ChatSession,
+  ChatMessage,
+  HomeKnowledge,
+  VisionPerson,
 } from './types';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -811,4 +815,184 @@ export async function updateDeviceConfig(
 }
 
 // ── Schema maintenance ────────────────────────────────────────────────────────
+
+// ── Chat sessions ─────────────────────────────────────────────────────────────
+
+export async function createChatSession(
+  sessionKey: string,
+  personName?: string | null
+): Promise<{ success: boolean; dbError?: DbError }> {
+  return tryMutate('createChatSession', () =>
+    db
+      .insertInto('chat_sessions')
+      .values({ session_key: sessionKey, person_name: personName ?? null })
+      .onConflict((oc) => oc.column('session_key').doNothing())
+      .execute()
+      .then(() => undefined)
+  );
+}
+
+export async function getChatSession(sessionKey: string): Promise<{
+  success: boolean;
+  dbError?: DbError;
+  row: ChatSession | null;
+}> {
+  return tryRow('getChatSession', () =>
+    db
+      .selectFrom('chat_sessions')
+      .selectAll()
+      .where('session_key', '=', sessionKey)
+      .executeTakeFirst()
+  );
+}
+
+export async function setChatSessionSummary(
+  sessionKey: string,
+  summary: string
+): Promise<{ success: boolean; dbError?: DbError }> {
+  return tryMutate('setChatSessionSummary', () =>
+    db
+      .updateTable('chat_sessions')
+      .set({ summary, ended_at: new Date() })
+      .where('session_key', '=', sessionKey)
+      .execute()
+      .then(() => undefined)
+  );
+}
+
+export async function getRecentSessionSummaries(limit = 5): Promise<string[]> {
+  try {
+    const rows = await db
+      .selectFrom('chat_sessions')
+      .select(['summary', 'started_at', 'person_name'])
+      .where('summary', 'is not', null)
+      .orderBy('started_at', 'desc')
+      .limit(limit)
+      .execute();
+    return rows
+      .filter((r) => r.summary)
+      .map((r) => {
+        const date = r.started_at.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        const who = r.person_name ? ` (with ${r.person_name})` : '';
+        return `[${date}${who}]: ${r.summary}`;
+      });
+  } catch {
+    return [];
+  }
+}
+
+// ── Chat messages ─────────────────────────────────────────────────────────────
+
+export async function appendChatMessage(
+  sessionKey: string,
+  role: string,
+  content: string
+): Promise<{ success: boolean; dbError?: DbError }> {
+  return tryMutate('appendChatMessage', async () => {
+    await sql`
+      INSERT INTO chat_messages (session_id, role, content)
+      SELECT id, ${role}, ${content} FROM chat_sessions WHERE session_key = ${sessionKey}
+    `.execute(db);
+  });
+}
+
+export async function getChatMessages(
+  sessionKey: string
+): Promise<ChatMessage[]> {
+  try {
+    const result = await sql<ChatMessage>`
+      SELECT cm.id, cm.session_id, cm.role, cm.content, cm.timestamp
+      FROM chat_messages cm
+      JOIN chat_sessions cs ON cs.id = cm.session_id
+      WHERE cs.session_key = ${sessionKey}
+      ORDER BY cm.timestamp ASC
+    `.execute(db);
+    return result.rows;
+  } catch {
+    return [];
+  }
+}
+
+// ── Home knowledge ────────────────────────────────────────────────────────────
+
+export async function getAllHomeKnowledge(): Promise<HomeKnowledge[]> {
+  try {
+    return db
+      .selectFrom('home_knowledge')
+      .selectAll()
+      .orderBy('subject')
+      .orderBy('category')
+      .execute();
+  } catch {
+    return [];
+  }
+}
+
+export async function insertHomeKnowledge(
+  subject: string,
+  category: string,
+  fact: string
+): Promise<{ success: boolean; dbError?: DbError; id: number | null }> {
+  try {
+    const row = await db
+      .insertInto('home_knowledge')
+      .values({ subject, category, fact, updated_at: new Date() })
+      .returning('id')
+      .executeTakeFirstOrThrow();
+    return { success: true, id: row.id };
+  } catch (err) {
+    return { success: false, dbError: await createDbError(err, 'insertHomeKnowledge'), id: null };
+  }
+}
+
+export async function updateHomeKnowledge(
+  id: number,
+  subject: string,
+  category: string,
+  fact: string
+): Promise<{ success: boolean; dbError?: DbError }> {
+  return tryMutate('updateHomeKnowledge', () =>
+    db
+      .updateTable('home_knowledge')
+      .set({ subject, category, fact, updated_at: new Date() })
+      .where('id', '=', id)
+      .execute()
+      .then(() => undefined)
+  );
+}
+
+export async function deleteHomeKnowledge(
+  id: number
+): Promise<{ success: boolean; dbError?: DbError }> {
+  return tryMutate('deleteHomeKnowledge', () =>
+    db.deleteFrom('home_knowledge').where('id', '=', id).execute().then(() => undefined)
+  );
+}
+
+export async function getVisionPeople(): Promise<VisionPerson[]> {
+  try {
+    return db.selectFrom('vision_people').selectAll().orderBy('name').execute();
+  } catch {
+    return [];
+  }
+}
+
+export async function upsertVisionPerson(
+  name: string,
+  photoCount: number
+): Promise<{ success: boolean; dbError?: DbError }> {
+  return tryMutate('upsertVisionPerson', () =>
+    db
+      .insertInto('vision_people')
+      .values({ name, photo_count: photoCount, enrolled_at: new Date() })
+      .onConflict((oc) =>
+        oc.column('name').doUpdateSet({
+          photo_count: photoCount,
+          enrolled_at: new Date(),
+        })
+      )
+      .execute()
+      .then(() => undefined)
+  );
+}
 

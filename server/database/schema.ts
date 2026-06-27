@@ -107,6 +107,38 @@ interface DevicePresenceTable {
   last_boot: ColumnType<Date, Date | undefined, Date>;
 }
 
+interface ChatSessionsTable {
+  id: Generated<number>;
+  session_key: string;
+  started_at: Generated<Date>;
+  ended_at: Date | null;
+  summary: string | null;
+  person_name: string | null;
+}
+
+interface ChatMessagesTable {
+  id: Generated<number>;
+  session_id: number;
+  role: string;
+  content: string;
+  timestamp: Generated<Date>;
+}
+
+interface HomeKnowledgeTable {
+  id: Generated<number>;
+  subject: string;
+  category: string;
+  fact: string;
+  updated_at: ColumnType<Date, Date | undefined, Date>;
+}
+
+interface VisionPeopleTable {
+  id: Generated<number>;
+  name: string;
+  enrolled_at: Generated<Date>;
+  photo_count: number;
+}
+
 export interface Database {
   watering_events: WateringEventsTable;
   tank_readings: TankReadingsTable;
@@ -121,4 +153,8 @@ export interface Database {
   photo_reactions: PhotoReactionsTable;
   users: UsersTable;
   device_presence: DevicePresenceTable;
+  chat_sessions: ChatSessionsTable;
+  chat_messages: ChatMessagesTable;
+  home_knowledge: HomeKnowledgeTable;
+  vision_people: VisionPeopleTable;
 }

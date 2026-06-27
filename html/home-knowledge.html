@@ -1,0 +1,892 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Papu's Memory | Papu</title>
+  <link rel="stylesheet" href="css/dashboard.css" />
+  <style>
+    body { max-width: 720px; margin: 0 auto; padding: 24px 20px 60px; }
+
+    .page-header {
+      display: flex;
+      align-items: baseline;
+      gap: 16px;
+      margin-bottom: 32px;
+      border-bottom: 1px solid #1e293b;
+      padding-bottom: 14px;
+    }
+    .page-header h1 { margin: 0; font-size: 1.1rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-main); }
+    .page-header a  { color: var(--text-dim); text-decoration: none; font-size: 0.85rem; }
+    .page-header a:hover { color: var(--accent-blue); }
+
+    /* ── Progress ─────────────────────────────────────────────── */
+    .progress-card {
+      background: var(--card-bg);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 16px;
+      padding: 24px;
+      margin-bottom: 24px;
+    }
+    .progress-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-bottom: 14px;
+    }
+    .progress-title {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--text-dim);
+    }
+    .progress-pct {
+      font-size: 1.8rem;
+      font-weight: 700;
+      color: var(--accent-blue);
+      line-height: 1;
+    }
+    .progress-track {
+      height: 6px;
+      background: rgba(255,255,255,0.07);
+      border-radius: 3px;
+      overflow: hidden;
+      margin-bottom: 20px;
+    }
+    .progress-fill {
+      height: 100%;
+      background: var(--accent-blue);
+      border-radius: 3px;
+      transition: width 0.6s ease;
+    }
+    .categories {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+      gap: 10px;
+    }
+    .cat-row {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .cat-label-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+    }
+    .cat-label {
+      font-size: 0.72rem;
+      color: var(--text-dim);
+    }
+    .cat-count {
+      font-size: 0.68rem;
+      color: var(--text-dim);
+      opacity: 0.6;
+    }
+    .cat-track {
+      height: 3px;
+      background: rgba(255,255,255,0.07);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+    .cat-fill {
+      height: 100%;
+      border-radius: 2px;
+      transition: width 0.6s ease;
+    }
+    .cat-fill-low    { background: #f87171; }
+    .cat-fill-mid    { background: #fbbf24; }
+    .cat-fill-good   { background: #4ade80; }
+
+    /* ── People ───────────────────────────────────────────────── */
+    .people-card {
+      background: var(--card-bg);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 16px;
+      padding: 24px;
+      margin-bottom: 24px;
+    }
+    .people-header {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--text-dim);
+      margin-bottom: 16px;
+    }
+    .people-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+    .people-chip {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(56,189,248,0.08);
+      border: 1px solid rgba(56,189,248,0.2);
+      border-radius: 20px;
+      padding: 6px 12px;
+      font-size: 0.82rem;
+      color: var(--text-main);
+    }
+    .people-chip-count {
+      font-size: 0.68rem;
+      color: var(--text-dim);
+    }
+    .people-empty {
+      color: var(--text-dim);
+      font-size: 0.85rem;
+      margin-bottom: 16px;
+    }
+    .enroll-form {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 8px;
+      align-items: end;
+    }
+    @media (max-width: 500px) { .enroll-form { grid-template-columns: 1fr; } }
+    .enroll-fields { display: flex; flex-direction: column; gap: 8px; }
+    .enroll-form .field-wrap input[type="text"] { width: 100%; box-sizing: border-box; }
+    .file-drop {
+      background: rgba(15,23,42,0.7);
+      border: 1px dashed #1e293b;
+      border-radius: 8px;
+      padding: 14px 12px;
+      color: var(--text-dim);
+      font-size: 0.82rem;
+      cursor: pointer;
+      transition: border-color 0.15s, color 0.15s;
+      text-align: center;
+      position: relative;
+    }
+    .file-drop:hover { border-color: var(--accent-blue); color: var(--accent-blue); }
+    .file-drop input[type="file"] {
+      position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%;
+    }
+    .file-drop.has-files { border-color: var(--accent-blue); color: var(--text-main); }
+    .enroll-status {
+      font-size: 0.78rem;
+      color: var(--accent-green);
+      min-height: 16px;
+      margin-top: 8px;
+    }
+    .enroll-status.err { color: var(--accent-red); }
+
+    /* ── Interview ────────────────────────────────────────────── */
+    .interview-card {
+      background: var(--card-bg);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 16px;
+      padding: 24px;
+      margin-bottom: 24px;
+    }
+    .interview-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 6px;
+    }
+    .interview-title {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--text-dim);
+    }
+    .interview-subtitle {
+      font-size: 0.82rem;
+      color: var(--text-dim);
+      margin-bottom: 20px;
+      line-height: 1.5;
+    }
+
+    .loading-state {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: var(--text-dim);
+      font-size: 0.85rem;
+      padding: 20px 0;
+    }
+    .spinner {
+      width: 16px; height: 16px;
+      border: 2px solid rgba(255,255,255,0.1);
+      border-top-color: var(--accent-blue);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      flex-shrink: 0;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .questions-list {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .question-item { display: flex; flex-direction: column; gap: 6px; }
+    .question-num  {
+      font-size: 0.68rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--text-dim);
+      opacity: 0.5;
+    }
+    .question-text { font-size: 0.9rem; color: var(--text-main); line-height: 1.4; }
+    .question-input {
+      background: rgba(15,23,42,0.7);
+      border: 1px solid #1e293b;
+      border-radius: 8px;
+      padding: 9px 12px;
+      color: var(--text-main);
+      font-family: inherit;
+      font-size: 0.88rem;
+      line-height: 1.4;
+      resize: none;
+      outline: none;
+      width: 100%;
+      box-sizing: border-box;
+      transition: border-color 0.15s;
+      overflow: hidden;
+    }
+    .question-input:focus { border-color: var(--accent-blue); }
+
+    .interview-actions {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 22px;
+    }
+    .btn-primary {
+      background: var(--accent-blue);
+      color: #0f172a;
+      border: none;
+      border-radius: 8px;
+      padding: 10px 22px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.15s;
+    }
+    .btn-primary:hover { opacity: 0.85; }
+    .btn-primary:disabled { opacity: 0.35; cursor: not-allowed; }
+    .btn-ghost {
+      background: transparent;
+      border: 1px solid #1e293b;
+      border-radius: 8px;
+      padding: 10px 18px;
+      color: var(--text-dim);
+      font-size: 0.82rem;
+      cursor: pointer;
+      transition: border-color 0.15s, color 0.15s;
+    }
+    .btn-ghost:hover { border-color: var(--accent-blue); color: var(--accent-blue); }
+
+    .save-result {
+      font-size: 0.82rem;
+      color: var(--accent-green);
+      min-height: 18px;
+    }
+    .save-result.error { color: var(--accent-red); }
+
+    /* ── Facts browser ────────────────────────────────────────── */
+    .facts-section { margin-top: 8px; }
+    .facts-toggle {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: none;
+      border: none;
+      color: var(--text-dim);
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      cursor: pointer;
+      padding: 0;
+      margin-bottom: 16px;
+      transition: color 0.15s;
+    }
+    .facts-toggle:hover { color: var(--text-main); }
+    .facts-toggle-arrow { font-size: 0.6rem; transition: transform 0.2s; }
+    .facts-toggle.open .facts-toggle-arrow { transform: rotate(90deg); }
+
+    .facts-body { display: none; }
+    .facts-body.open { display: block; }
+
+    .add-form-card {
+      background: var(--card-bg);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 12px;
+      padding: 16px 20px;
+      margin-bottom: 20px;
+      display: grid;
+      grid-template-columns: 1fr 1fr 3fr auto;
+      gap: 8px;
+      align-items: end;
+    }
+    @media (max-width: 600px) {
+      .add-form-card { grid-template-columns: 1fr 1fr; }
+      .fact-field, .add-btn-cell { grid-column: 1 / -1; }
+    }
+    .field-wrap { display: flex; flex-direction: column; gap: 4px; }
+    .field-label {
+      font-size: 0.65rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-dim);
+    }
+    .field-wrap input,
+    .field-wrap textarea {
+      background: rgba(15,23,42,0.7);
+      border: 1px solid #1e293b;
+      border-radius: 8px;
+      padding: 8px 12px;
+      color: var(--text-main);
+      font-family: inherit;
+      font-size: 0.88rem;
+      outline: none;
+      width: 100%;
+      box-sizing: border-box;
+      transition: border-color 0.15s;
+    }
+    .field-wrap input:focus,
+    .field-wrap textarea:focus { border-color: var(--accent-blue); }
+    .field-wrap textarea { resize: vertical; min-height: 38px; line-height: 1.4; }
+    .add-btn-cell button {
+      width: 100%;
+      padding: 8px 16px;
+      background: rgba(56,189,248,0.15);
+      border: 1px solid var(--accent-blue);
+      border-radius: 8px;
+      color: var(--accent-blue);
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s;
+      white-space: nowrap;
+    }
+    .add-btn-cell button:hover { background: rgba(56,189,248,0.25); }
+    .add-btn-cell button:disabled { opacity: 0.4; cursor: not-allowed; }
+    .add-status { font-size: 0.75rem; color: var(--accent-green); min-height: 14px; grid-column: 1/-1; }
+    .add-status.err { color: var(--accent-red); }
+
+    .subject-group { margin-bottom: 20px; }
+    .subject-header {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--accent-blue);
+      border-bottom: 1px solid #1e3a5f;
+      padding-bottom: 5px;
+      margin-bottom: 8px;
+    }
+    .fact-row {
+      display: grid;
+      grid-template-columns: 110px 1fr auto;
+      gap: 10px;
+      align-items: start;
+      padding: 9px 12px;
+      background: var(--card-bg);
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 8px;
+      margin-bottom: 5px;
+      transition: border-color 0.15s;
+    }
+    .fact-row:hover { border-color: rgba(255,255,255,0.14); }
+    .fact-row.editing { border-color: var(--accent-blue); }
+    .fact-cat  { font-size: 0.7rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.06em; padding-top: 2px; }
+    .fact-txt  { font-size: 0.88rem; color: var(--text-main); line-height: 1.4; }
+    .fact-btns { display: flex; gap: 5px; flex-shrink: 0; }
+    .icon-btn {
+      background: none;
+      border: 1px solid #1e293b;
+      border-radius: 5px;
+      color: var(--text-dim);
+      font-size: 0.72rem;
+      padding: 3px 8px;
+      cursor: pointer;
+      transition: border-color 0.15s, color 0.15s;
+      white-space: nowrap;
+    }
+    .icon-btn:hover       { border-color: var(--accent-blue); color: var(--accent-blue); }
+    .icon-btn.del:hover   { border-color: var(--accent-red); color: var(--accent-red); }
+    .icon-btn.save:hover  { border-color: var(--accent-green); color: var(--accent-green); }
+
+    .inline-edit {
+      grid-column: 1 / -1;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-top: 2px;
+    }
+    .inline-edit-top { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+    .inline-edit input,
+    .inline-edit textarea {
+      background: rgba(15,23,42,0.7);
+      border: 1px solid #1e293b;
+      border-radius: 6px;
+      padding: 6px 10px;
+      color: var(--text-main);
+      font-family: inherit;
+      font-size: 0.85rem;
+      outline: none;
+      width: 100%;
+      box-sizing: border-box;
+    }
+    .inline-edit input:focus,
+    .inline-edit textarea:focus { border-color: var(--accent-blue); }
+    .inline-edit textarea { min-height: 36px; resize: vertical; }
+    .inline-edit-actions { display: flex; gap: 6px; }
+    .empty { color: var(--text-dim); font-size: 0.85rem; padding: 20px 0; }
+  </style>
+</head>
+<body>
+  <div class="page-header">
+    <a href="/">← home</a>
+    <h1>Papu's Memory</h1>
+  </div>
+
+  <!-- Progress -->
+  <div class="progress-card">
+    <div class="progress-header">
+      <span class="progress-title">Knowledge coverage</span>
+      <span class="progress-pct" id="pct-num">—%</span>
+    </div>
+    <div class="progress-track">
+      <div class="progress-fill" id="pct-bar" style="width:0%"></div>
+    </div>
+    <div class="categories" id="categories"></div>
+  </div>
+
+  <!-- People / Vision Enrollment -->
+  <div class="people-card">
+    <div class="people-header">Recognized people</div>
+    <div class="people-grid" id="people-grid">
+      <span class="people-empty">Loading…</span>
+    </div>
+
+    <div class="field-wrap" style="margin-bottom:8px">
+      <label class="field-label">Enroll a new person</label>
+    </div>
+    <div class="enroll-form">
+      <div class="enroll-fields">
+        <div class="field-wrap">
+          <label class="field-label">Name</label>
+          <input id="ep-name" type="text" placeholder="e.g. Nico" autocomplete="off" />
+        </div>
+        <div class="file-drop" id="ep-drop">
+          <input id="ep-files" type="file" accept="image/*" multiple />
+          <span id="ep-drop-label">Choose up to 20 photos</span>
+        </div>
+      </div>
+      <div class="add-btn-cell">
+        <button id="ep-submit" disabled>Enroll</button>
+      </div>
+    </div>
+    <div class="enroll-status" id="ep-status"></div>
+  </div>
+
+  <!-- Interview -->
+  <div class="interview-card">
+    <div class="interview-header">
+      <span class="interview-title">Onboarding interview</span>
+    </div>
+    <p class="interview-subtitle">
+      Papu will ask questions to learn about your home and household. Answer as many as you like — skip any by leaving them blank.
+    </p>
+    <div id="interview-body">
+      <div class="loading-state" id="q-loading">
+        <div class="spinner"></div>
+        Papu is thinking of questions…
+      </div>
+      <div class="questions-list" id="questions-list" style="display:none"></div>
+      <div class="interview-actions" id="interview-actions" style="display:none">
+        <div class="save-result" id="save-result"></div>
+        <div style="display:flex;gap:10px">
+          <button class="btn-ghost" id="btn-skip">New questions</button>
+          <button class="btn-primary" id="btn-save">Save answers</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Facts browser -->
+  <div class="facts-section">
+    <button class="facts-toggle" id="facts-toggle">
+      <span class="facts-toggle-arrow">▶</span>
+      All facts
+    </button>
+    <div class="facts-body" id="facts-body">
+      <!-- Add form -->
+      <div class="add-form-card">
+        <div class="field-wrap">
+          <label class="field-label">Subject</label>
+          <input id="f-subject" type="text" placeholder="e.g. Nico" list="subject-list" autocomplete="off" />
+          <datalist id="subject-list"></datalist>
+        </div>
+        <div class="field-wrap">
+          <label class="field-label">Category</label>
+          <input id="f-category" type="text" placeholder="e.g. hobby" list="category-list" autocomplete="off" />
+          <datalist id="category-list">
+            <option value="identity"><option value="hobby"><option value="health">
+            <option value="work"><option value="schedule"><option value="preference">
+            <option value="social"><option value="home"><option value="contact">
+          </datalist>
+        </div>
+        <div class="field-wrap fact-field">
+          <label class="field-label">Fact</label>
+          <textarea id="f-fact" rows="1" placeholder="e.g. Nico enjoys yoga as a hobby."></textarea>
+        </div>
+        <div class="add-btn-cell">
+          <button id="f-add-btn">Add</button>
+        </div>
+        <div class="add-status" id="f-status"></div>
+      </div>
+      <div id="facts-list"></div>
+    </div>
+  </div>
+
+  <script>
+    // ── State ─────────────────────────────────────────────────────────────────
+    let questions = [];
+    let facts     = [];
+
+    // ── Init ──────────────────────────────────────────────────────────────────
+    (async () => {
+      await Promise.all([loadCoverage(), loadQuestions(), loadFacts(), loadPeople()]);
+    })();
+
+    // ── People / enrollment ───────────────────────────────────────────────────
+    async function loadPeople() {
+      try {
+        const people = await fetch('/api/vision/people').then(r => r.json());
+        renderPeople(people);
+      } catch {
+        document.getElementById('people-grid').innerHTML =
+          '<span class="people-empty">Could not load.</span>';
+      }
+    }
+
+    function renderPeople(people) {
+      const el = document.getElementById('people-grid');
+      if (!people.length) {
+        el.innerHTML = '<span class="people-empty">No one enrolled yet.</span>';
+        return;
+      }
+      el.innerHTML = people.map(p => `
+        <div class="people-chip">
+          <span>${esc(p.name)}</span>
+          <span class="people-chip-count">${p.photo_count} photo${p.photo_count !== 1 ? 's' : ''}</span>
+        </div>`).join('');
+    }
+
+    const epFiles  = document.getElementById('ep-files');
+    const epDrop   = document.getElementById('ep-drop');
+    const epLabel  = document.getElementById('ep-drop-label');
+    const epName   = document.getElementById('ep-name');
+    const epSubmit = document.getElementById('ep-submit');
+    const epStatus = document.getElementById('ep-status');
+
+    function updateEnrollBtn() {
+      epSubmit.disabled = !epName.value.trim() || !epFiles.files.length;
+    }
+
+    epFiles.addEventListener('change', () => {
+      const n = epFiles.files.length;
+      if (n > 20) {
+        epLabel.textContent = 'Max 20 photos — please re-select';
+        epDrop.classList.remove('has-files');
+      } else if (n > 0) {
+        epLabel.textContent = `${n} photo${n !== 1 ? 's' : ''} selected`;
+        epDrop.classList.add('has-files');
+      } else {
+        epLabel.textContent = 'Choose up to 20 photos';
+        epDrop.classList.remove('has-files');
+      }
+      updateEnrollBtn();
+    });
+
+    epName.addEventListener('input', updateEnrollBtn);
+
+    epSubmit.addEventListener('click', async () => {
+      const name = epName.value.trim();
+      const files = epFiles.files;
+      if (!name || !files.length) return;
+      if (files.length > 20) {
+        epStatus.textContent = 'Please select 20 or fewer photos.';
+        epStatus.className = 'enroll-status err';
+        return;
+      }
+
+      epSubmit.disabled = true;
+      epStatus.textContent = 'Enrolling…';
+      epStatus.className = 'enroll-status';
+
+      const form = new FormData();
+      form.append('name', name);
+      for (const f of files) form.append('photos', f);
+
+      try {
+        const data = await fetch('/api/vision/enroll', { method: 'POST', body: form }).then(r => r.json());
+        if (data.error) throw new Error(data.error);
+        epStatus.textContent = `Enrolled ${data.enrolled} photo${data.enrolled !== 1 ? 's' : ''} for ${name}.`;
+        epName.value = '';
+        epFiles.value = '';
+        epLabel.textContent = 'Choose up to 20 photos';
+        epDrop.classList.remove('has-files');
+        await loadPeople();
+      } catch (e) {
+        epStatus.textContent = e.message || 'Enrollment failed.';
+        epStatus.className = 'enroll-status err';
+        epSubmit.disabled = false;
+      }
+    });
+
+    // ── Coverage ──────────────────────────────────────────────────────────────
+    async function loadCoverage() {
+      try {
+        const data = await fetch('/api/home-knowledge/coverage').then(r => r.json());
+        renderCoverage(data);
+      } catch {}
+    }
+
+    function renderCoverage(data) {
+      document.getElementById('pct-num').textContent = data.pct + '%';
+      document.getElementById('pct-bar').style.width = data.pct + '%';
+
+      const el = document.getElementById('categories');
+      el.innerHTML = data.categories.map(c => {
+        const cls = c.pct === 0 ? 'cat-fill-low' : c.pct < 60 ? 'cat-fill-mid' : 'cat-fill-good';
+        return `
+          <div class="cat-row">
+            <div class="cat-label-row">
+              <span class="cat-label">${esc(c.label)}</span>
+              <span class="cat-count">${c.count}/${c.target}</span>
+            </div>
+            <div class="cat-track"><div class="cat-fill ${cls}" style="width:${c.pct}%"></div></div>
+          </div>`;
+      }).join('');
+    }
+
+    // ── Interview ─────────────────────────────────────────────────────────────
+    async function loadQuestions() {
+      document.getElementById('q-loading').style.display    = 'flex';
+      document.getElementById('questions-list').style.display = 'none';
+      document.getElementById('interview-actions').style.display = 'none';
+      try {
+        const data = await fetch('/api/home-knowledge/questions', { method: 'POST' }).then(r => r.json());
+        questions = data.questions || [];
+        renderQuestions();
+      } catch {
+        document.getElementById('q-loading').innerHTML = '<span style="color:var(--accent-red)">Failed to load questions. Is the LLM online?</span>';
+      }
+    }
+
+    function renderQuestions() {
+      document.getElementById('q-loading').style.display = 'none';
+      const list = document.getElementById('questions-list');
+      list.style.display = 'flex';
+      list.innerHTML = questions.map((q, i) => `
+        <div class="question-item">
+          <span class="question-num">Question ${i + 1}</span>
+          <div class="question-text">${esc(q.question)}</div>
+          <textarea
+            class="question-input"
+            data-idx="${i}"
+            rows="1"
+            placeholder="Leave blank to skip"
+            oninput="autoGrow(this)"
+          ></textarea>
+        </div>
+      `).join('');
+      document.getElementById('interview-actions').style.display = 'flex';
+    }
+
+    function autoGrow(el) {
+      el.style.height = 'auto';
+      el.style.height = el.scrollHeight + 'px';
+    }
+
+    document.getElementById('btn-save').addEventListener('click', async () => {
+      const inputs = document.querySelectorAll('.question-input');
+      const pairs = [];
+      inputs.forEach((inp, i) => {
+        const answer = inp.value.trim();
+        if (answer) pairs.push({ ...questions[i], answer });
+      });
+
+      const btn = document.getElementById('btn-save');
+      const resultEl = document.getElementById('save-result');
+      btn.disabled = true;
+      btn.textContent = 'Saving…';
+      resultEl.textContent = '';
+      resultEl.className = 'save-result';
+
+      try {
+        const data = await fetch('/api/home-knowledge/answers', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ pairs }),
+        }).then(r => r.json());
+
+        if (data.error) throw new Error(data.error);
+        resultEl.textContent = `${data.saved} fact${data.saved !== 1 ? 's' : ''} added`;
+        await Promise.all([loadCoverage(), loadFacts()]);
+        await loadQuestions();
+      } catch (e) {
+        resultEl.textContent = 'Something went wrong.';
+        resultEl.className = 'save-result error';
+        btn.disabled = false;
+        btn.textContent = 'Save answers';
+      }
+    });
+
+    document.getElementById('btn-skip').addEventListener('click', loadQuestions);
+
+    // ── Facts browser ─────────────────────────────────────────────────────────
+    const factsToggle = document.getElementById('facts-toggle');
+    const factsBody   = document.getElementById('facts-body');
+    factsToggle.addEventListener('click', () => {
+      const open = factsBody.classList.toggle('open');
+      factsToggle.classList.toggle('open', open);
+    });
+
+    async function loadFacts() {
+      try {
+        facts = await fetch('/api/home-knowledge').then(r => r.json());
+        renderFacts();
+        updateSubjectList();
+      } catch {}
+    }
+
+    function updateSubjectList() {
+      const dl = document.getElementById('subject-list');
+      const subjects = [...new Set(facts.map(f => f.subject))];
+      dl.innerHTML = subjects.map(s => `<option value="${esc(s)}">`).join('');
+    }
+
+    function renderFacts() {
+      const el = document.getElementById('facts-list');
+      if (!facts.length) { el.innerHTML = '<div class="empty">No facts yet.</div>'; return; }
+      const bySubject = {};
+      for (const f of facts) {
+        if (!bySubject[f.subject]) bySubject[f.subject] = [];
+        bySubject[f.subject].push(f);
+      }
+      el.innerHTML = '';
+      for (const [subject, rows] of Object.entries(bySubject)) {
+        const group = document.createElement('div');
+        group.className = 'subject-group';
+        group.innerHTML = `<div class="subject-header">${esc(subject)}</div>`;
+        for (const f of rows) group.appendChild(buildFactRow(f));
+        el.appendChild(group);
+      }
+    }
+
+    function buildFactRow(f) {
+      const row = document.createElement('div');
+      row.className = 'fact-row';
+      row.id = `fr-${f.id}`;
+      row.innerHTML = `
+        <div class="fact-cat">${esc(f.category)}</div>
+        <div class="fact-txt">${esc(f.fact)}</div>
+        <div class="fact-btns">
+          <button class="icon-btn" data-edit="${f.id}">edit</button>
+          <button class="icon-btn del" data-del="${f.id}">×</button>
+        </div>`;
+      row.querySelector('[data-edit]').addEventListener('click', () => startEdit(f.id));
+      row.querySelector('[data-del]').addEventListener('click',  () => deleteFact(f.id));
+      return row;
+    }
+
+    function startEdit(id) {
+      const f = facts.find(x => x.id === id);
+      if (!f) return;
+      const row = document.getElementById(`fr-${id}`);
+      row.classList.add('editing');
+      row.innerHTML = `
+        <div class="inline-edit">
+          <div class="inline-edit-top">
+            <input id="es-${id}" value="${esc(f.subject)}" list="subject-list" />
+            <input id="ec-${id}" value="${esc(f.category)}" list="category-list" />
+          </div>
+          <textarea id="ef-${id}" rows="2">${esc(f.fact)}</textarea>
+          <div class="inline-edit-actions">
+            <button class="icon-btn save" id="sv-${id}">save</button>
+            <button class="icon-btn" id="cn-${id}">cancel</button>
+          </div>
+        </div>`;
+      row.querySelector(`#sv-${id}`).addEventListener('click', () => saveEdit(id));
+      row.querySelector(`#cn-${id}`).addEventListener('click', renderFacts);
+      row.querySelector(`#ef-${id}`).addEventListener('keydown', e => {
+        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); saveEdit(id); }
+      });
+    }
+
+    async function saveEdit(id) {
+      const subject  = document.getElementById(`es-${id}`).value.trim();
+      const category = document.getElementById(`ec-${id}`).value.trim();
+      const fact     = document.getElementById(`ef-${id}`).value.trim();
+      if (!subject || !category || !fact) return;
+      await fetch(`/api/home-knowledge/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subject, category, fact }),
+      });
+      await loadFacts();
+    }
+
+    async function deleteFact(id) {
+      if (!confirm('Delete this fact?')) return;
+      await fetch(`/api/home-knowledge/${id}`, { method: 'DELETE' });
+      await loadFacts();
+      await loadCoverage();
+    }
+
+    // Add form
+    document.getElementById('f-add-btn').addEventListener('click', addFact);
+    document.getElementById('f-fact').addEventListener('keydown', e => {
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); addFact(); }
+    });
+
+    async function addFact() {
+      const subject  = document.getElementById('f-subject').value.trim();
+      const category = document.getElementById('f-category').value.trim();
+      const fact     = document.getElementById('f-fact').value.trim();
+      const status   = document.getElementById('f-status');
+      if (!subject || !category || !fact) {
+        status.textContent = 'All three fields are required.';
+        status.className = 'add-status err';
+        return;
+      }
+      const btn = document.getElementById('f-add-btn');
+      btn.disabled = true;
+      try {
+        const res = await fetch('/api/home-knowledge', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ subject, category, fact }),
+        });
+        if (!res.ok) throw new Error();
+        document.getElementById('f-subject').value  = '';
+        document.getElementById('f-category').value = '';
+        document.getElementById('f-fact').value     = '';
+        status.textContent = 'Added.';
+        status.className = 'add-status';
+        await Promise.all([loadFacts(), loadCoverage()]);
+      } catch {
+        status.textContent = 'Failed to add.';
+        status.className = 'add-status err';
+      } finally {
+        btn.disabled = false;
+        setTimeout(() => { status.textContent = ''; }, 2500);
+      }
+    }
+
+    // ── Util ──────────────────────────────────────────────────────────────────
+    function esc(s) {
+      return String(s)
+        .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+  </script>
+</body>
+</html>

@@ -90,6 +90,38 @@ export interface DailyStdDev {
   daily_stddev: number;
 }
 
+export interface ChatSession {
+  id: number;
+  session_key: string;
+  started_at: Date;
+  ended_at: Date | null;
+  summary: string | null;
+  person_name: string | null;
+}
+
+export interface ChatMessage {
+  id: number;
+  session_id: number;
+  role: string;
+  content: string;
+  timestamp: Date;
+}
+
+export interface HomeKnowledge {
+  id: number;
+  subject: string;
+  category: string;
+  fact: string;
+  updated_at: Date;
+}
+
+export interface VisionPerson {
+  id: number;
+  name: string;
+  enrolled_at: Date;
+  photo_count: number;
+}
+
 export interface DeviceWithStatus {
   device_id: string;
   friendly_name: string | null;

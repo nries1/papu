@@ -218,6 +218,13 @@ async function canWaterPlants(device_id: string): Promise<boolean> {
   return latestLevel > 4; // percentage-based; tank-size-agnostic
 }
 
+export function publishLearnFrame(name: string, imageBase64: string): boolean {
+  if (!client.connected) return false;
+  const payload = JSON.stringify({ name, frame: imageBase64 });
+  client.publish('robot/vision/learn', payload, { qos: 1 });
+  return true;
+}
+
 export async function publishWaterCommand(payload: WaterCommandPayload): Promise<boolean> {
   const { device_id, event_id, action, duration_ms } = payload;
 
