@@ -889,3 +889,15 @@
 1782581970: New connection from 172.18.0.3:55524 on port 9001.
 1782581970: New client connected from 172.18.0.3:55524 as mqttjs_82f2f311 (p4, c1, k60).
 1782582047: Client mqttjs_82f2f311 [172.18.0.3:55524] disconnected: connection closed by client.
+1782582658: Client mqttjs_b13afb2e [172.18.0.5:51646] disconnected: connection closed by client.
+1782582659: New connection from 172.18.0.5:41680 on port 1883.
+1782582659: New client connected from 172.18.0.5:41680 as mqttjs_673b5460 (p4, c1, k60).
+1782582702: New connection from 172.18.0.3:36570 on port 9001.
+1782582702: New client connected from 172.18.0.3:36570 as mqttjs_dfa7a206 (p4, c1, k60).
+1782582703: Client mqttjs_dfa7a206 [172.18.0.3:36570] disconnected: connection closed by client.
+1782582703: New connection from 172.18.0.3:36576 on port 9001.
+1782582703: New client connected from 172.18.0.3:36576 as mqttjs_d0a316e0 (p4, c1, k60).
+1782582745: Client mqttjs_d0a316e0 [172.18.0.3:36576] disconnected: connection closed by client.
+1782582745: New connection from 172.18.0.3:58042 on port 9001.
+1782582745: New client connected from 172.18.0.3:58042 as mqttjs_97b08f68 (p4, c1, k60).
+1782582754: Client mqttjs_97b08f68 [172.18.0.3:58042] disconnected: connection closed by client.

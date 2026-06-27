@@ -2,7 +2,7 @@ import { getDevices, appendWaterHistory, getWaterHistory } from '../database/dao
 import { publishWaterCommand } from '../pubsub/mqttService';
 import SHARED from '../../shared/plant_config.json';
 
-const DEFAULT_DURATION_SECONDS = 60;
+const DEFAULT_DURATION_SECONDS = 30;
 
 export interface ActionResult {
   success: boolean;
