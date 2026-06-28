@@ -548,6 +548,21 @@ export async function getSystemLogs({
                COALESCE(d.friendly_name, dl.device_id) AS source, dl.details, dl.timestamp
         FROM device_logs dl
         LEFT JOIN devices d ON d.device_id = dl.device_id
+        UNION ALL
+        SELECT 'api' AS log_type,
+               CASE WHEN status_code >= 500 THEN 'error'
+                    WHEN status_code >= 400 THEN 'warn'
+                    ELSE 'info' END AS log_level,
+               path AS message,
+               'api' AS source,
+               jsonb_build_object(
+                 'status_code', status_code,
+                 'response_time_ms', response_time_ms,
+                 'request_body', request_body,
+                 'response_body', response_body
+               ) AS details,
+               timestamp
+        FROM api_logs
       ) AS logs
       WHERE (${log_type}::text IS NULL OR log_type = ${log_type})
         AND (${log_level}::text IS NULL OR log_level = ${log_level})

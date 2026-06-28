@@ -1052,3 +1052,12 @@
 1782621233: Client mqttjs_c7a844a6 [172.18.0.5:51304] disconnected: connection closed by client.
 1782621234: New connection from 172.18.0.5:60600 on port 1883.
 1782621234: New client connected from 172.18.0.5:60600 as mqttjs_8bf32685 (p4, c1, k60).
+1782621517: Client mqttjs_8bf32685 [172.18.0.5:60600] disconnected: connection closed by client.
+1782621518: New connection from 172.18.0.5:52844 on port 1883.
+1782621518: New client connected from 172.18.0.5:52844 as mqttjs_f625e72b (p4, c1, k60).
+1782621746: Client mqttjs_f625e72b [172.18.0.5:52844] disconnected: connection closed by client.
+1782621747: New connection from 172.18.0.5:45816 on port 1883.
+1782621747: New client connected from 172.18.0.5:45816 as mqttjs_14b991c3 (p4, c1, k60).
+1782622155: Client mqttjs_14b991c3 [172.18.0.5:45816] disconnected: connection closed by client.
+1782622156: New connection from 172.18.0.5:46604 on port 1883.
+1782622156: New client connected from 172.18.0.5:46604 as mqttjs_1b747506 (p4, c1, k60).

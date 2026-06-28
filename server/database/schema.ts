@@ -52,7 +52,7 @@ interface ApiLogsTable {
   status_code: number | null;
   response_body: JsonbNullable;
   response_time_ms: number | null;
-  timestamp: Generated<Date>; // was created_at before migration 008
+  timestamp: Generated<Date>;
 }
 
 interface AppLogsTable {
@@ -157,4 +157,10 @@ export interface Database {
   chat_messages: ChatMessagesTable;
   home_knowledge: HomeKnowledgeTable;
   vision_people: VisionPeopleTable;
+  schema_migrations: SchemaMigrationsTable;
+}
+
+interface SchemaMigrationsTable {
+  version: string;
+  applied_at: Generated<Date>;
 }
