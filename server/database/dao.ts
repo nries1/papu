@@ -401,6 +401,8 @@ const API_LOG_SUPPRESSED_PATHS = new Set([
   '/api/weather',
   '/api/ai-summary',
   '/api/display-stats',
+  '/api/service-stats',
+  '/api/device-health-stats',
 ]);
 
 const LOG_RETENTION_DAYS = parseInt(process.env.LOG_RETENTION_DAYS ?? '30', 10);
@@ -583,6 +585,134 @@ export async function getSystemLogs({
 }
 
 // ── AI summaries ──────────────────────────────────────────────────────────────
+
+export type DeviceHealthRow = {
+  device_id: string;
+  friendly_name: string | null;
+  device_type: string | null;
+  room_display_name: string | null;
+  env_readings_7d: number;
+  tank_readings_7d: number;
+  watering_total_7d: number;
+  watering_complete_7d: number;
+  watering_errors_7d: number;
+  device_log_errors_7d: number;
+};
+
+export async function getDeviceHealthStats(): Promise<{ success: boolean; dbError?: DbError; rows: DeviceHealthRow[] }> {
+  return tryRows('getDeviceHealthStats', async () => {
+    const result = await sql<DeviceHealthRow>`
+      SELECT
+        d.device_id,
+        d.friendly_name,
+        d.device_type,
+        r.display_name AS room_display_name,
+        COALESCE(env.cnt, 0)::int          AS env_readings_7d,
+        COALESCE(tank.cnt, 0)::int         AS tank_readings_7d,
+        COALESCE(water.total, 0)::int      AS watering_total_7d,
+        COALESCE(water.complete, 0)::int   AS watering_complete_7d,
+        COALESCE(water.errors, 0)::int     AS watering_errors_7d,
+        COALESCE(dlogs.errors, 0)::int     AS device_log_errors_7d
+      FROM devices d
+      LEFT JOIN rooms r ON r.id = d.room_id
+      LEFT JOIN (
+        SELECT device_id, COUNT(*) AS cnt
+        FROM environment_readings
+        WHERE timestamp >= NOW() - INTERVAL '7 days'
+        GROUP BY device_id
+      ) env ON env.device_id = d.device_id
+      LEFT JOIN (
+        SELECT device_id, COUNT(*) AS cnt
+        FROM tank_readings
+        WHERE timestamp >= NOW() - INTERVAL '7 days'
+        GROUP BY device_id
+      ) tank ON tank.device_id = d.device_id
+      LEFT JOIN (
+        SELECT
+          device_id,
+          COUNT(*)                                                    AS total,
+          COUNT(*) FILTER (WHERE status = 'complete')                 AS complete,
+          COUNT(*) FILTER (WHERE status NOT IN ('complete', 'requested', 'BLOCKED_LOW_WATER')) AS errors
+        FROM watering_events
+        WHERE timestamp >= NOW() - INTERVAL '7 days'
+        GROUP BY device_id
+      ) water ON water.device_id = d.device_id
+      LEFT JOIN (
+        SELECT device_id, COUNT(*) AS errors
+        FROM device_logs
+        WHERE log_level = 'error' AND timestamp >= NOW() - INTERVAL '7 days'
+        GROUP BY device_id
+      ) dlogs ON dlogs.device_id = d.device_id
+      ORDER BY r.display_name NULLS LAST, d.friendly_name
+    `.execute(db);
+    return result.rows;
+  });
+}
+
+export async function getServiceStats(): Promise<{
+  success: boolean;
+  api: { total: number; by_bucket: Array<{ bucket: string; count: number }> };
+  mqtt: { total: number; errors: number };
+  ai: { total: number; errors: number };
+}> {
+  const empty = { api: { total: 0, by_bucket: [] as Array<{ bucket: string; count: number }> }, mqtt: { total: 0, errors: 0 }, ai: { total: 0, errors: 0 } };
+  try {
+    const [apiRes, mqttTotalRes, mqttErrRes, aiRes] = await Promise.all([
+      sql<{ bucket: string; count: number }>`
+        SELECT
+          CASE
+            WHEN status_code >= 500 THEN '5xx'
+            WHEN status_code >= 400 THEN '4xx'
+            WHEN status_code >= 300 THEN '3xx'
+            ELSE '2xx'
+          END AS bucket,
+          COUNT(*)::int AS count
+        FROM api_logs
+        WHERE timestamp >= NOW() - INTERVAL '7 days'
+        GROUP BY bucket
+        ORDER BY bucket
+      `.execute(db),
+      sql<{ total: number }>`
+        SELECT
+          (SELECT COUNT(*) FROM device_logs      WHERE timestamp >= NOW() - INTERVAL '7 days') +
+          (SELECT COUNT(*) FROM tank_readings    WHERE timestamp >= NOW() - INTERVAL '7 days') +
+          (SELECT COUNT(*) FROM environment_readings WHERE timestamp >= NOW() - INTERVAL '7 days') +
+          (SELECT COUNT(*) FROM watering_events  WHERE timestamp >= NOW() - INTERVAL '7 days')
+        AS total
+      `.execute(db),
+      sql<{ errors: number }>`
+        SELECT COUNT(*)::int AS errors
+        FROM app_logs
+        WHERE source = 'mqttService' AND log_level = 'error'
+          AND timestamp >= NOW() - INTERVAL '7 days'
+      `.execute(db),
+      sql<{ total: number; errors: number }>`
+        SELECT
+          COUNT(*)::int AS total,
+          COUNT(*) FILTER (WHERE log_level = 'error')::int AS errors
+        FROM app_logs
+        WHERE source IN ('chatContext', 'aiSummaryService')
+          AND timestamp >= NOW() - INTERVAL '7 days'
+      `.execute(db),
+    ]);
+
+    const byBucket = apiRes.rows.map((r) => ({ bucket: r.bucket, count: Number(r.count) }));
+    const apiTotal = byBucket.reduce((sum, r) => sum + r.count, 0);
+    const mqttTotal = Number(mqttTotalRes.rows[0]?.total ?? 0);
+    const mqttErrors = Number(mqttErrRes.rows[0]?.errors ?? 0);
+    const aiRow = aiRes.rows[0] ?? { total: 0, errors: 0 };
+
+    return {
+      success: true,
+      api: { total: apiTotal, by_bucket: byBucket },
+      mqtt: { total: mqttTotal, errors: mqttErrors },
+      ai: { total: Number(aiRow.total), errors: Number(aiRow.errors) },
+    };
+  } catch (err) {
+    await logDbError(err, 'getServiceStats');
+    return { success: false, ...empty };
+  }
+}
 
 export async function saveAiSummary({
   summary,

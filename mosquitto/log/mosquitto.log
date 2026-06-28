@@ -1090,3 +1090,33 @@
 1782657620: Client mqttjs_43887322 [172.18.0.5:56288] disconnected: connection closed by client.
 1782657621: New connection from 172.18.0.5:39424 on port 1883.
 1782657621: New client connected from 172.18.0.5:39424 as mqttjs_c05caf8c (p4, c1, k60).
+1782658758: Saving in-memory database to /mosquitto/data//mosquitto.db.
+1782660559: Saving in-memory database to /mosquitto/data//mosquitto.db.
+1782662360: Saving in-memory database to /mosquitto/data//mosquitto.db.
+1782664161: Saving in-memory database to /mosquitto/data//mosquitto.db.
+1782665962: Saving in-memory database to /mosquitto/data//mosquitto.db.
+1782667763: Saving in-memory database to /mosquitto/data//mosquitto.db.
+1782669564: Saving in-memory database to /mosquitto/data//mosquitto.db.
+1782671365: Saving in-memory database to /mosquitto/data//mosquitto.db.
+1782671733: New connection from 172.18.0.3:58302 on port 9001.
+1782671733: New client connected from 172.18.0.3:58302 as mqttjs_fde8d346 (p4, c1, k60).
+1782671737: Client mqttjs_fde8d346 [172.18.0.3:58302] disconnected: connection closed by client.
+1782671739: New connection from 172.18.0.3:59832 on port 9001.
+1782671739: New client connected from 172.18.0.3:59832 as mqttjs_e6f3cfc2 (p4, c1, k60).
+1782671741: Client mqttjs_e6f3cfc2 [172.18.0.3:59832] disconnected: connection closed by client.
+1782673166: Saving in-memory database to /mosquitto/data//mosquitto.db.
+1782673307: Client mqttjs_c05caf8c [172.18.0.5:39424] disconnected: connection closed by client.
+1782673308: New connection from 172.18.0.5:44830 on port 1883.
+1782673308: New client connected from 172.18.0.5:44830 as mqttjs_8a1b285a (p4, c1, k60).
+1782673426: New connection from 172.18.0.3:56356 on port 9001.
+1782673426: New client connected from 172.18.0.3:56356 as mqttjs_905edd7d (p4, c1, k60).
+1782673427: Client mqttjs_905edd7d [172.18.0.3:56356] disconnected: connection closed by client.
+1782674494: New connection from 172.18.0.3:54328 on port 9001.
+1782674494: New client connected from 172.18.0.3:54328 as mqttjs_050d179f (p4, c1, k60).
+1782674497: Client mqttjs_050d179f [172.18.0.3:54328] disconnected: connection closed by client.
+1782674741: New connection from 172.18.0.3:44798 on port 9001.
+1782674741: New client connected from 172.18.0.3:44798 as mqttjs_d1f2692b (p4, c1, k60).
+1782674743: Client mqttjs_d1f2692b [172.18.0.3:44798] disconnected: connection closed by client.
+1782674939: Client mqttjs_8a1b285a [172.18.0.5:44830] disconnected: connection closed by client.
+1782674940: New connection from 172.18.0.5:33740 on port 1883.
+1782674940: New client connected from 172.18.0.5:33740 as mqttjs_d2fce825 (p4, c1, k60).

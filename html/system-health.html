@@ -25,27 +25,58 @@
       </div>
 
       <!-- Service health cards -->
-      <div class="grid grid-cols-4 gap-4 mb-6">
-        <div id="svc-api" class="bg-slate-800/50 border border-slate-700 rounded-2xl p-5 flex flex-col items-center gap-2">
-          <span class="text-[10px] uppercase tracking-widest text-slate-500 font-bold">API</span>
-          <div class="svc-dot w-3 h-3 rounded-full bg-slate-600 transition-colors duration-300"></div>
-          <span class="svc-detail text-xs text-slate-500"></span>
+      <div class="grid grid-cols-3 gap-4 mb-6">
+        <div id="svc-api" class="bg-slate-800/50 border border-slate-700 rounded-2xl p-5 flex flex-col gap-3">
+          <div class="flex items-center gap-2">
+            <span class="text-[10px] uppercase tracking-widest text-slate-500 font-bold">API</span>
+            <div class="ml-auto flex items-center gap-1.5">
+              <div class="svc-dot w-2 h-2 rounded-full bg-slate-600 transition-colors duration-300"></div>
+              <span class="svc-detail text-[11px] text-slate-500"></span>
+            </div>
+          </div>
+          <div id="api-stats" class="space-y-1.5 text-xs text-slate-600">loading…</div>
         </div>
-        <div id="svc-mqtt" class="bg-slate-800/50 border border-slate-700 rounded-2xl p-5 flex flex-col items-center gap-2">
-          <span class="text-[10px] uppercase tracking-widest text-slate-500 font-bold">MQTT</span>
-          <div class="svc-dot w-3 h-3 rounded-full bg-slate-600 transition-colors duration-300"></div>
-          <span class="svc-detail text-xs text-slate-500"></span>
+        <div id="svc-mqtt" class="bg-slate-800/50 border border-slate-700 rounded-2xl p-5 flex flex-col gap-3">
+          <div class="flex items-center gap-2">
+            <span class="text-[10px] uppercase tracking-widest text-slate-500 font-bold">MQTT Broker</span>
+            <div class="ml-auto flex items-center gap-1.5">
+              <div class="svc-dot w-2 h-2 rounded-full bg-slate-600 transition-colors duration-300"></div>
+              <span class="svc-detail text-[11px] text-slate-500"></span>
+            </div>
+          </div>
+          <div id="mqtt-stats" class="space-y-1.5 text-xs text-slate-600">loading…</div>
         </div>
-        <div id="svc-worker" class="bg-slate-800/50 border border-slate-700 rounded-2xl p-5 flex flex-col items-center gap-2">
-          <span class="text-[10px] uppercase tracking-widest text-slate-500 font-bold">Vision Worker</span>
-          <div class="svc-dot w-3 h-3 rounded-full bg-slate-600 transition-colors duration-300"></div>
-          <span class="svc-detail text-xs text-slate-500"></span>
+        <div id="svc-ai" class="bg-slate-800/50 border border-slate-700 rounded-2xl p-5 flex flex-col gap-3">
+          <div class="flex items-center gap-2">
+            <span class="text-[10px] uppercase tracking-widest text-slate-500 font-bold">AI</span>
+            <div class="ml-auto flex items-center gap-1.5">
+              <div class="svc-dot w-2 h-2 rounded-full bg-slate-600 transition-colors duration-300"></div>
+              <span class="svc-detail text-[11px] text-slate-500"></span>
+            </div>
+          </div>
+          <div id="ai-stats" class="space-y-1.5 text-xs text-slate-600">loading…</div>
         </div>
-        <div id="svc-publisher" class="bg-slate-800/50 border border-slate-700 rounded-2xl p-5 flex flex-col items-center gap-2">
-          <span class="text-[10px] uppercase tracking-widest text-slate-500 font-bold">Publisher</span>
-          <div class="svc-dot w-3 h-3 rounded-full bg-slate-600 transition-colors duration-300"></div>
-          <span class="svc-detail text-xs text-slate-500"></span>
+      </div>
+
+      <!-- Device health card -->
+      <div class="bg-slate-800/50 border border-slate-700 rounded-2xl overflow-hidden mb-6">
+        <div class="px-5 py-4 border-b border-slate-700 flex items-center justify-between">
+          <span class="text-[10px] uppercase tracking-widest text-slate-500 font-bold">Device Health · 7d</span>
         </div>
+        <div id="device-health-loading" class="p-6 text-center text-xs text-slate-600">Loading…</div>
+        <table id="device-health-table" class="hidden w-full text-xs">
+          <thead>
+            <tr class="border-b border-slate-700 text-[10px] uppercase tracking-widest text-slate-500">
+              <th class="px-5 py-3 text-left">Device</th>
+              <th class="px-5 py-3 text-right">Env Readings</th>
+              <th class="px-5 py-3 text-right">Tank Readings</th>
+              <th class="px-5 py-3 text-right">Watering</th>
+              <th class="px-5 py-3 text-right">Dev Errors</th>
+            </tr>
+          </thead>
+          <tbody id="device-health-body"></tbody>
+        </table>
+        <div id="device-health-empty" class="hidden p-6 text-center text-xs text-slate-600">No devices found.</div>
       </div>
 
       <!-- System stats widget -->
@@ -281,9 +312,10 @@
 
       function setServiceTile(id, status, detail) {
         const tile = document.getElementById(id);
+        if (!tile) return;
         const dot = tile.querySelector('.svc-dot');
         const detailEl = tile.querySelector('.svc-detail');
-        dot.className = 'svc-dot w-3 h-3 rounded-full transition-colors duration-300 ' + (dotColors[status] || 'bg-slate-600');
+        dot.className = 'svc-dot w-2 h-2 rounded-full transition-colors duration-300 ' + (dotColors[status] || 'bg-slate-600');
         detailEl.textContent = detail;
       }
 
@@ -298,16 +330,141 @@
           const res = await fetch('/api/health');
           const h = await res.json();
           setServiceTile('svc-api', h.api === 'ok' ? 'ok' : 'offline', h.api === 'ok' ? 'responding' : 'unreachable');
-          setServiceTile('svc-mqtt', h.mqtt, h.mqtt === 'ok' ? 'broker connected' : 'broker offline');
-          setServiceTile('svc-worker', h.visionWorker.status, h.visionWorker.lastSeenMs === null ? 'no results yet' : 'last result ' + formatAge(h.visionWorker.lastSeenMs));
-          setServiceTile('svc-publisher', h.publisher.status, h.publisher.lastSeenMs === null ? 'no frames yet' : 'last frame ' + formatAge(h.publisher.lastSeenMs));
+          setServiceTile('svc-mqtt', h.mqtt === 'ok' ? 'ok' : 'offline', h.mqtt === 'ok' ? 'connected' : 'offline');
+
+          const aiStatus = (h.visionWorker.status === 'ok' || h.publisher.status === 'ok') ? 'ok'
+            : (h.visionWorker.status === 'stale' || h.publisher.status === 'stale') ? 'stale'
+            : 'offline';
+          const workerAge = h.visionWorker.lastSeenMs !== null ? 'worker ' + formatAge(h.visionWorker.lastSeenMs) : null;
+          const framesAge = h.publisher.lastSeenMs !== null ? 'frames ' + formatAge(h.publisher.lastSeenMs) : null;
+          setServiceTile('svc-ai', aiStatus, [workerAge, framesAge].filter(Boolean).join(' · ') || 'no activity');
         } catch {
           setServiceTile('svc-api', 'offline', 'unreachable');
         }
       }
 
+      function renderApiStats(api) {
+        if (!api || api.total === 0) return '<div class="text-slate-600">No requests logged</div>';
+        const COLORS  = { '2xx': 'bg-emerald-500', '3xx': 'bg-sky-500', '4xx': 'bg-amber-500', '5xx': 'bg-red-500' };
+        const LABELS  = { '2xx': 'text-emerald-400', '3xx': 'text-sky-400', '4xx': 'text-amber-400', '5xx': 'text-red-400' };
+        const bars = api.by_bucket.map(b => {
+          const pct = (b.count / api.total * 100);
+          const barW = Math.max(pct, 0.4).toFixed(1);
+          return `<div class="flex items-center gap-2">
+            <span class="w-7 font-mono ${LABELS[b.bucket] || 'text-slate-400'}">${b.bucket}</span>
+            <div class="flex-1 bg-slate-900 rounded-full h-1.5 overflow-hidden">
+              <div class="${COLORS[b.bucket] || 'bg-slate-500'} h-full transition-all" style="width:${barW}%"></div>
+            </div>
+            <span class="font-mono text-slate-300 w-10 text-right">${pct.toFixed(1)}%</span>
+            <span class="font-mono text-slate-500 w-14 text-right">${b.count.toLocaleString()}</span>
+          </div>`;
+        }).join('');
+        return `<div class="text-slate-500 mb-2">${api.total.toLocaleString()} req · 7d</div>${bars}`;
+      }
+
+      function renderRateStats(s, label) {
+        if (!s || s.total === 0) return `<div class="text-slate-600">No ${label} recorded</div>`;
+        const errPct = s.errors / s.total * 100;
+        const okW = Math.max(100 - errPct, 0).toFixed(1);
+        const healthy = errPct < 5;
+        const errCls = healthy ? 'text-slate-400' : 'text-red-400';
+        const barCls = healthy ? 'bg-emerald-500' : 'bg-red-500';
+        return `<div class="text-slate-500">${s.total.toLocaleString()} ${label} · 7d</div>
+          <div class="flex items-center gap-2 mt-1">
+            <div class="flex-1 bg-slate-900 rounded-full h-1.5 overflow-hidden">
+              <div class="${barCls} h-full transition-all" style="width:${okW}%"></div>
+            </div>
+            <span class="font-mono ${errCls} shrink-0">${s.errors.toLocaleString()} err · ${errPct.toFixed(1)}%</span>
+          </div>`;
+      }
+
+      async function loadServiceStats() {
+        try {
+          const res = await fetch('/api/service-stats');
+          const data = await res.json();
+          document.getElementById('api-stats').innerHTML  = renderApiStats(data.api);
+          document.getElementById('mqtt-stats').innerHTML = renderRateStats(data.mqtt, 'msg');
+          document.getElementById('ai-stats').innerHTML   = renderRateStats(data.ai, 'events');
+        } catch (e) {
+          console.error('Failed to load service stats', e);
+        }
+      }
+
+      function fmtCount(n) {
+        return n > 0 ? n.toLocaleString() : '<span class="text-slate-700">—</span>';
+      }
+
+      function renderDeviceHealth(devices) {
+        const loading = document.getElementById('device-health-loading');
+        const table   = document.getElementById('device-health-table');
+        const empty   = document.getElementById('device-health-empty');
+        const tbody   = document.getElementById('device-health-body');
+
+        loading.classList.add('hidden');
+
+        if (!devices || !devices.length) {
+          empty.classList.remove('hidden');
+          return;
+        }
+
+        tbody.innerHTML = devices.map(d => {
+          const name = escHtml(d.friendly_name || d.device_id);
+          const room = d.room_display_name ? `<div class="text-slate-600 mt-0.5">${escHtml(d.room_display_name)}</div>` : '';
+
+          const envCell = fmtCount(d.env_readings_7d);
+
+          const tankCell = fmtCount(d.tank_readings_7d);
+
+          let waterCell;
+          if (d.watering_total_7d === 0) {
+            waterCell = '<span class="text-slate-700">—</span>';
+          } else {
+            const errCount = d.watering_errors_7d;
+            const complete = d.watering_complete_7d;
+            const total    = d.watering_total_7d;
+            const blocked  = total - complete - errCount;
+            let parts = [`<span class="text-emerald-400">${complete} ok</span>`];
+            if (blocked > 0) parts.push(`<span class="text-amber-400">${blocked} blocked</span>`);
+            if (errCount  > 0) parts.push(`<span class="text-red-400">${errCount} err</span>`);
+            waterCell = parts.join(' · ');
+          }
+
+          const errCount = d.device_log_errors_7d;
+          const errCell  = errCount > 0
+            ? `<span class="text-red-400 font-mono">${errCount}</span>`
+            : '<span class="text-slate-600 font-mono">0</span>';
+
+          return `<tr class="border-b border-slate-700/50 hover:bg-slate-700/20 transition">
+            <td class="px-5 py-3 text-slate-300">${name}${room}</td>
+            <td class="px-5 py-3 text-right font-mono text-slate-300">${envCell}</td>
+            <td class="px-5 py-3 text-right font-mono text-slate-300">${tankCell}</td>
+            <td class="px-5 py-3 text-right">${waterCell}</td>
+            <td class="px-5 py-3 text-right">${errCell}</td>
+          </tr>`;
+        }).join('');
+
+        table.classList.remove('hidden');
+      }
+
+      async function loadDeviceHealth() {
+        try {
+          const res = await fetch('/api/device-health-stats');
+          const data = await res.json();
+          renderDeviceHealth(data);
+        } catch (e) {
+          console.error('Failed to load device health', e);
+          document.getElementById('device-health-loading').textContent = 'Failed to load.';
+        }
+      }
+
       pollHealth();
       setInterval(pollHealth, 15000);
+
+      loadServiceStats();
+      setInterval(loadServiceStats, 60000);
+
+      loadDeviceHealth();
+      setInterval(loadDeviceHealth, 60000);
 
       loadLogs();
       updateStats();

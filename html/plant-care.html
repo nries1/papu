@@ -113,12 +113,6 @@
         </div>
       </div>
 
-      <div class="card">
-        <h3>Robot Vision <span id="vision-live-dot" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#475569;margin-left:6px;vertical-align:middle;transition:background 0.3s;"></span></h3>
-        <div id="vision-faces" style="margin-top:8px;font-size:0.95rem;color:#cbd5e1;">Waiting for frames...</div>
-        <div id="vision-last-seen" style="margin-top:8px;font-size:0.75rem;color:#64748b;"></div>
-      </div>
-
       <div class="card" style="grid-column: 1 / -1">
         <h3>Recent Watering History</h3>
         <table style="width: 100%; text-align: left">
@@ -318,48 +312,6 @@
           console.error("Failed to load latest temperature", e);
         }
       }
-
-      // Robot Vision SSE
-      (function () {
-        const dot = document.getElementById('vision-live-dot');
-        const facesEl = document.getElementById('vision-faces');
-        const lastSeenEl = document.getElementById('vision-last-seen');
-        let staleTimer = null;
-
-        function markStale() {
-          dot.style.background = '#475569';
-          facesEl.textContent = 'No frames received recently.';
-        }
-
-        const es = new EventSource('/api/vision/stream');
-        es.onmessage = (e) => {
-          let result;
-          try { result = JSON.parse(e.data); } catch (_) { return; }
-
-          dot.style.background = '#22c55e';
-          lastSeenEl.textContent = 'Last frame: ' + new Date(result.timestamp).toLocaleTimeString();
-
-          clearTimeout(staleTimer);
-          staleTimer = setTimeout(markStale, 5000);
-
-          const faces = result.faces || [];
-          if (!faces.length) {
-            facesEl.textContent = 'No faces detected.';
-            return;
-          }
-          facesEl.innerHTML = faces.map((f) => {
-            const conf = Math.round(f.confidence * 100);
-            const pan = f.pan_delta > 0 ? `→ ${f.pan_delta}` : `← ${Math.abs(f.pan_delta)}`;
-            const tilt = f.tilt_delta > 0 ? `↓ ${f.tilt_delta}` : `↑ ${Math.abs(f.tilt_delta)}`;
-            return `<div style="padding:4px 0;border-bottom:1px solid #1e293b;">
-              <strong style="color:#e2e8f0;">${f.name}</strong>
-              <span style="color:#94a3b8;font-size:0.85rem;margin-left:8px;">${conf}% conf</span>
-              <span style="color:#64748b;font-size:0.8rem;margin-left:8px;">${pan} ${tilt}</span>
-            </div>`;
-          }).join('');
-        };
-        es.onerror = () => { dot.style.background = '#ef4444'; };
-      })();
 
       // Initialize
       loadRooms();

@@ -45,6 +45,8 @@ import {
   deleteHomeKnowledge,
   getVisionPeople,
   upsertVisionPerson,
+  getServiceStats,
+  getDeviceHealthStats,
 } from '../database/dao';
 
 const app = express();
@@ -454,6 +456,17 @@ app.get('/api/rooms', async (req, res) => {
       .json({ error: dbError!.name, debugId: dbError!.debugId });
   }
   res.status(200).json(rows);
+});
+
+app.get('/api/service-stats', async (_req, res) => {
+  const result = await getServiceStats();
+  return res.status(result.success ? 200 : 500).json(result);
+});
+
+app.get('/api/device-health-stats', async (_req, res) => {
+  const { success, rows, dbError } = await getDeviceHealthStats();
+  if (!success) return res.status(500).json({ error: dbError!.name, debugId: dbError!.debugId });
+  return res.json(rows);
 });
 
 app.get('/api/stats', async (req, res) => {
