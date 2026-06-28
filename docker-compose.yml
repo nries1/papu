@@ -43,6 +43,18 @@ services:
       - '/dev/ttyACM0:/dev/ttyACM0' # Allows flashing from the container
     profiles: ['tools'] # Only runs when explicitly called
 
+  homeassistant:
+    image: ghcr.io/home-assistant/home-assistant:stable
+    container_name: homeassistant
+    environment:
+      - TZ=America/New_York
+    volumes:
+      - ./homeassistant/config:/config
+      - /etc/localtime:/etc/localtime:ro
+    ports:
+      - '8123:8123'
+    restart: unless-stopped
+
   mqtt-broker:
     image: eclipse-mosquitto:latest
     container_name: mqtt-broker

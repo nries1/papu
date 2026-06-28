@@ -27,3 +27,6 @@ robot.md
 ota_err.txt
 ota_out.txt
 mosquitto/log/mosquitto.log
+
+# Home Assistant runtime config (contains secrets and auth tokens)
+homeassistant/config/

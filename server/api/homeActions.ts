@@ -1,6 +1,94 @@
+import axios from 'axios';
 import { getDevices, appendWaterHistory, getWaterHistory } from '../database/dao';
 import { publishWaterCommand } from '../pubsub/mqttService';
 import SHARED from '../../shared/plant_config.json';
+
+const HA_URL = process.env.HOMEASSISTANT_URL || 'http://homeassistant:8123';
+const HA_TOKEN = process.env.HOMEASSISTANT_TOKEN || '';
+
+export interface LightEntityInfo {
+  entity_id: string;
+  friendly_name: string;
+  state: string;
+  brightness_pct?: number;
+}
+
+export async function getLightEntities(): Promise<LightEntityInfo[]> {
+  if (!HA_TOKEN) return [];
+  try {
+    const res = await axios.get<
+      Array<{
+        entity_id: string;
+        state: string;
+        attributes: { friendly_name?: string; brightness?: number };
+      }>
+    >(`${HA_URL}/api/states`, {
+      headers: { Authorization: `Bearer ${HA_TOKEN}` },
+      timeout: 5000,
+    });
+    return res.data
+      .filter((e) => e.entity_id.startsWith('light.'))
+      .map((e) => ({
+        entity_id: e.entity_id,
+        friendly_name: e.attributes.friendly_name || e.entity_id.replace('light.', '').replace(/_/g, ' '),
+        state: e.state,
+        brightness_pct: e.attributes.brightness !== undefined
+          ? Math.round((e.attributes.brightness / 255) * 100)
+          : undefined,
+      }));
+  } catch {
+    return [];
+  }
+}
+
+export interface LightCommand {
+  entity_ids: string[];
+  action: 'turn_on' | 'turn_off';
+  brightness_pct?: number;
+  rgb_color?: [number, number, number];
+  kelvin?: number;
+}
+
+export async function controlLight(command: LightCommand): Promise<ActionResult> {
+  if (!HA_TOKEN) {
+    return { success: false, summary: 'Home Assistant is not configured (missing HOMEASSISTANT_TOKEN).' };
+  }
+  if (!command.entity_ids.length) {
+    return { success: false, summary: 'No lights matched that request.' };
+  }
+
+  const payload: Record<string, unknown> = { entity_id: command.entity_ids };
+  if (command.action === 'turn_on') {
+    if (command.brightness_pct !== undefined) {
+      payload.brightness_pct = Math.max(1, Math.min(100, command.brightness_pct));
+    }
+    if (command.rgb_color) payload.rgb_color = command.rgb_color;
+    if (command.kelvin) payload.color_temp_kelvin = command.kelvin;
+  }
+
+  try {
+    await axios.post(`${HA_URL}/api/services/light/${command.action}`, payload, {
+      headers: { Authorization: `Bearer ${HA_TOKEN}`, 'Content-Type': 'application/json' },
+      timeout: 8000,
+    });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return { success: false, summary: `Light control failed: ${msg}` };
+  }
+
+  const names = command.entity_ids
+    .map((id) => id.replace(/^light\./, '').replace(/_/g, ' '))
+    .join(', ');
+
+  let verb = command.action === 'turn_off' ? 'turned off' : 'turned on';
+  if (command.action === 'turn_on') {
+    if (command.brightness_pct !== undefined) verb += ` at ${command.brightness_pct}%`;
+    if (command.rgb_color) verb += ` with custom color`;
+    if (command.kelvin) verb += ` at ${command.kelvin}K`;
+  }
+
+  return { success: true, summary: `${names}: ${verb}` };
+}
 
 const DEFAULT_DURATION_SECONDS = 30;
 
