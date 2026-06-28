@@ -25,6 +25,17 @@ import type {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
+async function logDbError(raw: unknown, source: string): Promise<DbError> {
+  const dbError = createDbError(raw, source);
+  await appLog({
+    message: raw instanceof Error ? raw : new Error(String(raw)),
+    details: dbError.details,
+    source,
+    level: 'error',
+  });
+  return dbError;
+}
+
 async function tryRows<T>(
   source: string,
   fn: () => Promise<T[]>
@@ -32,7 +43,7 @@ async function tryRows<T>(
   try {
     return { success: true, rows: await fn() };
   } catch (err) {
-    return { success: false, dbError: await createDbError(err, source), rows: [] };
+    return { success: false, dbError: await logDbError(err, source), rows: [] };
   }
 }
 
@@ -43,7 +54,7 @@ async function tryRow<T>(
   try {
     return { success: true, row: (await fn()) ?? null };
   } catch (err) {
-    return { success: false, dbError: await createDbError(err, source), row: null };
+    return { success: false, dbError: await logDbError(err, source), row: null };
   }
 }
 
@@ -55,7 +66,7 @@ async function tryMutate(
     await fn();
     return { success: true };
   } catch (err) {
-    return { success: false, dbError: await createDbError(err, source) };
+    return { success: false, dbError: await logDbError(err, source) };
   }
 }
 
@@ -541,8 +552,6 @@ export async function getSystemLogs({
     const result = await sql<SystemLog>`
       SELECT * FROM (
         SELECT 'app'    AS log_type, log_level, message, source, details, timestamp FROM app_logs
-        UNION ALL
-        SELECT 'db'     AS log_type, log_level, message, source, details, timestamp FROM db_logs
         UNION ALL
         SELECT 'device' AS log_type, dl.log_level, dl.message,
                COALESCE(d.friendly_name, dl.device_id) AS source, dl.details, dl.timestamp

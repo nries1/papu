@@ -84,7 +84,6 @@
             <option value="">All Types</option>
             <option value="api">API</option>
             <option value="app">App</option>
-            <option value="db">DB</option>
             <option value="device">Hardware</option>
           </select>
         </div>
@@ -149,7 +148,6 @@
       const typeBadge = {
         api:    'bg-violet-900/60 text-violet-300 border border-violet-700',
         app:    'bg-emerald-900/60 text-emerald-300 border border-emerald-700',
-        db:     'bg-orange-900/60 text-orange-300 border border-orange-700',
         device: 'bg-cyan-900/60 text-cyan-300 border border-cyan-700',
       };
 
@@ -159,7 +157,7 @@
         error: 'bg-red-900/60 text-red-300 border border-red-700',
       };
 
-      const typeLabel = { api: 'API', app: 'App', db: 'DB', device: 'Hardware' };
+      const typeLabel = { api: 'API', app: 'App', device: 'Hardware' };
 
       async function loadLogs() {
         currentPage = 0;

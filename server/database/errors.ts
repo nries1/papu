@@ -1,5 +1,4 @@
 import crypto from 'crypto';
-import { db } from './db';
 
 const PG_ERROR_NAMES: Record<string, string> = {
   '23505': 'Duplicate entry',
@@ -21,40 +20,27 @@ const PG_ERROR_NAMES: Record<string, string> = {
 export class DbError extends Error {
   constructor(
     public readonly name: string,
-    public readonly errorId: number | null,
-    public readonly debugId: string
+    public readonly debugId: string,
+    public readonly details: Record<string, unknown>
   ) {
     super(name);
   }
 }
 
-export async function createDbError(raw: unknown, source: string): Promise<DbError> {
+export function createDbError(raw: unknown, source: string): DbError {
   const debugId = crypto.randomBytes(3).toString('hex');
   const pgErr = raw as Record<string, unknown>;
   const pgCode = pgErr?.['code'] as string | undefined;
   const name = (pgCode && PG_ERROR_NAMES[pgCode]) ?? 'Database error';
 
-  let errorId: number | null = null;
-  try {
-    const message = raw instanceof Error ? raw.message : String(raw) || 'Unknown error';
-    const details = JSON.stringify({
-      debugId,
-      code: pgCode ?? null,
-      severity: pgErr['severity'] ?? null,
-      detail: pgErr['detail'] ?? null,
-      hint: pgErr['hint'] ?? null,
-      position: pgErr['position'] ?? null,
-      routine: pgErr['routine'] ?? null,
-    });
-    const row = await db
-      .insertInto('db_logs')
-      .values({ log_level: 'error', message, details, source })
-      .returning('id')
-      .executeTakeFirst();
-    errorId = row?.id ?? null;
-  } catch (logErr) {
-    console.error('Failed to write db_log:', logErr);
-  }
-
-  return new DbError(name, errorId, debugId);
+  return new DbError(name, debugId, {
+    source,
+    debugId,
+    code: pgCode ?? null,
+    severity: pgErr['severity'] ?? null,
+    detail: pgErr['detail'] ?? null,
+    hint: pgErr['hint'] ?? null,
+    position: pgErr['position'] ?? null,
+    routine: pgErr['routine'] ?? null,
+  });
 }

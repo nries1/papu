@@ -1061,3 +1061,32 @@
 1782622155: Client mqttjs_14b991c3 [172.18.0.5:45816] disconnected: connection closed by client.
 1782622156: New connection from 172.18.0.5:46604 on port 1883.
 1782622156: New client connected from 172.18.0.5:46604 as mqttjs_1b747506 (p4, c1, k60).
+1782622738: Saving in-memory database to /mosquitto/data//mosquitto.db.
+1782624539: Saving in-memory database to /mosquitto/data//mosquitto.db.
+1782626340: Saving in-memory database to /mosquitto/data//mosquitto.db.
+1782628141: Saving in-memory database to /mosquitto/data//mosquitto.db.
+1782629942: Saving in-memory database to /mosquitto/data//mosquitto.db.
+1782631743: Saving in-memory database to /mosquitto/data//mosquitto.db.
+1782633544: Saving in-memory database to /mosquitto/data//mosquitto.db.
+1782635345: Saving in-memory database to /mosquitto/data//mosquitto.db.
+1782637146: Saving in-memory database to /mosquitto/data//mosquitto.db.
+1782638947: Saving in-memory database to /mosquitto/data//mosquitto.db.
+1782640748: Saving in-memory database to /mosquitto/data//mosquitto.db.
+1782642549: Saving in-memory database to /mosquitto/data//mosquitto.db.
+1782644350: Saving in-memory database to /mosquitto/data//mosquitto.db.
+1782646151: Saving in-memory database to /mosquitto/data//mosquitto.db.
+1782647952: Saving in-memory database to /mosquitto/data//mosquitto.db.
+1782649753: Saving in-memory database to /mosquitto/data//mosquitto.db.
+1782651554: Saving in-memory database to /mosquitto/data//mosquitto.db.
+1782653355: Saving in-memory database to /mosquitto/data//mosquitto.db.
+1782655156: Saving in-memory database to /mosquitto/data//mosquitto.db.
+1782656034: Client mqttjs_1b747506 [172.18.0.5:46604] disconnected: connection closed by client.
+1782656036: New connection from 172.18.0.5:59478 on port 1883.
+1782656036: New client connected from 172.18.0.5:59478 as mqttjs_04b3fb65 (p4, c1, k60).
+1782656639: Client mqttjs_04b3fb65 [172.18.0.5:59478] disconnected: connection closed by client.
+1782656640: New connection from 172.18.0.5:56288 on port 1883.
+1782656640: New client connected from 172.18.0.5:56288 as mqttjs_43887322 (p4, c1, k60).
+1782656957: Saving in-memory database to /mosquitto/data//mosquitto.db.
+1782657620: Client mqttjs_43887322 [172.18.0.5:56288] disconnected: connection closed by client.
+1782657621: New connection from 172.18.0.5:39424 on port 1883.
+1782657621: New client connected from 172.18.0.5:39424 as mqttjs_c05caf8c (p4, c1, k60).

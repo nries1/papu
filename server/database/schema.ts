@@ -64,14 +64,6 @@ interface AppLogsTable {
   timestamp: Generated<Date>;
 }
 
-interface DbLogsTable {
-  id: Generated<number>;
-  log_level: string;
-  message: string;
-  details: JsonbNullable;
-  source: string | null;
-  timestamp: Generated<Date>;
-}
 
 interface DeviceLogsTable {
   id: Generated<number>;
@@ -147,7 +139,6 @@ export interface Database {
   environment_readings: EnvironmentReadingsTable;
   api_logs: ApiLogsTable;
   app_logs: AppLogsTable;
-  db_logs: DbLogsTable;
   device_logs: DeviceLogsTable;
   ai_summaries: AiSummariesTable;
   photo_reactions: PhotoReactionsTable;

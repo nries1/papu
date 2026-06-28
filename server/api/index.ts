@@ -236,8 +236,7 @@ app.get('/api/display-stats', async (req, res) => {
     });
   } catch (e) {
     await appLog({
-      message: 'display-stats error',
-      details: e,
+      message: e instanceof Error ? e : new Error(String(e)),
       source: 'display-stats',
       level: 'error',
     });
@@ -319,8 +318,8 @@ app.get('/api/can-water', async (req, res) => {
     }
   } catch (e) {
     await appLog({
-      message: 'Error checking water level',
-      details: e,
+      message: e instanceof Error ? e : new Error(String(e)),
+      details: { context: 'checking water level' },
       source: 'can-water',
       level: 'warn',
     });
@@ -351,8 +350,8 @@ app.get('/api/can-water', async (req, res) => {
     }
   } catch (e) {
     await appLog({
-      message: 'Error checking watering history',
-      details: e,
+      message: e instanceof Error ? e : new Error(String(e)),
+      details: { context: 'checking watering history' },
       source: 'can-water',
       level: 'warn',
     });

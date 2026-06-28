@@ -179,7 +179,7 @@ If no lights apply, reply with: null`;
     await appLog({ message: 'light control result', details: { cmd, success: result.success, summary: result.summary }, source: 'chatContext', level: result.success ? 'info' : 'error' });
     return { executed: result.success, summary: result.summary };
   } catch (e) {
-    await appLog({ message: 'light control error', details: { userMessage, llmResponse: raw, error: String(e) }, source: 'chatContext', level: 'error' });
+    await appLog({ message: e instanceof Error ? e : new Error(String(e)), details: { userMessage, llmResponse: raw }, source: 'chatContext', level: 'error' });
     return { executed: false, summary: `Light control error: ${e instanceof Error ? e.message : String(e)}` };
   }
 }

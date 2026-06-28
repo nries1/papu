@@ -50,7 +50,7 @@ client.on('connect', async () => {
   for (const topic of topics) {
     client.subscribe(topic, async (err) => {
       if (err) {
-        await appLog({ message: `Failed to subscribe to ${topic}`, details: err.message, source: 'mqttService', level: 'warn' });
+        await appLog({ message: err, details: { topic }, source: 'mqttService', level: 'warn' });
       } else {
         await appLog({ message: `Subscribed to ${topic}`, source: 'mqttService', level: 'info' });
       }
@@ -183,7 +183,7 @@ client.on('offline', async () => {
 });
 
 client.on('error', async (err: Error) => {
-  await appLog({ message: 'MQTT client error', details: err, source: 'mqttService', level: 'error' });
+  await appLog({ message: err, source: 'mqttService', level: 'error' });
 });
 
 function getTopicName(device_id: string): string {

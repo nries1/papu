@@ -89,7 +89,7 @@ async function generateAndSaveSummary(): Promise<void> {
     await saveAiSummary({ summary });
     await appLog({ message: 'AI system summary generated', source: 'aiSummaryService', level: 'info' });
   } catch (err) {
-    await appLog({ message: 'Failed to generate AI summary', details: (err as Error).message, source: 'aiSummaryService', level: 'error' });
+    await appLog({ message: err instanceof Error ? err : new Error(String(err)), source: 'aiSummaryService', level: 'error' });
   }
 }
 
