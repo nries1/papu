@@ -6,6 +6,7 @@ import { up as up004 } from './migrations/004_api_logs_refactor';
 import { up as up005 } from './migrations/005_chat_context';
 import { up as up006 } from './migrations/006_home_knowledge_refactor';
 import { up as up007 } from './migrations/007_vision_people';
+import { up as up008 } from './migrations/008_log_cleanup';
 
 async function main() {
   console.log('Running migrations...');
@@ -17,6 +18,7 @@ async function main() {
     await up005(db);
     await up006(db);
     await up007(db);
+    await up008(db);
     console.log('Migrations complete.');
   } catch (err) {
     console.error('Migration failed:', err);

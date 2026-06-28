@@ -52,7 +52,7 @@ interface ApiLogsTable {
   status_code: number | null;
   response_body: JsonbNullable;
   response_time_ms: number | null;
-  timestamp: Generated<Date>;
+  timestamp: Generated<Date>; // was created_at before migration 008
 }
 
 interface AppLogsTable {

@@ -65,12 +65,6 @@ client.on('connect', async () => {
 
 client.on('message', async (topic: string, message: Buffer) => {
   const messageStr = message.toString();
-  await appLog({
-    message: 'MQTT message received',
-    details: { module: 'MQTT', topic, message: messageStr },
-    source: 'mqttService',
-    level: 'info',
-  });
 
   let data: Record<string, unknown>;
   try {
@@ -80,8 +74,6 @@ client.on('message', async (topic: string, message: Buffer) => {
   }
 
   if (topic === SHARED.pump_cycle_complete_topic) {
-    await appLog({ message: 'Pump cycle complete message received', details: { topic, data }, source: 'mqttService', level: 'info' });
-
     const { success, dbError, updatedCount } = await updateWaterEvent({
       event_id: data['event_id'] as number,
       duration: data['duration'] as number,
@@ -90,13 +82,11 @@ client.on('message', async (topic: string, message: Buffer) => {
     if (!success || updatedCount === 0) {
       await appLog({ message: 'Failed to update water event', details: { ...data, updatedCount, debugId: dbError?.debugId }, source: 'mqttService', level: 'error' });
     } else {
-      await appLog({ message: `Water event ${data['event_id']} updated to status ${data['status']}`, details: data, source: 'mqttService', level: 'info' });
+      await appLog({ message: `Pump cycle complete: event ${data['event_id']} → ${data['status']}`, details: data, source: 'mqttService', level: 'info' });
     }
   }
 
   if (topic === SHARED.water_level_topic) {
-    await appLog({ message: 'MQTT water_level payload received', details: { topic, data }, source: 'mqttService', level: 'info' });
-
     const deviceId = data['device_id'] as string;
     const rawValue = data['raw_value'] as number;
     const percentFull = data['percent_full'] as number;
@@ -122,8 +112,6 @@ client.on('message', async (topic: string, message: Buffer) => {
 
     if (!appendRes.success) {
       await appLog({ message: 'Failed to persist tank reading', details: { device_id: deviceId, debugId: appendRes.dbError?.debugId }, source: 'mqttService', level: 'error' });
-    } else {
-      await appLog({ message: `Tank level updated for ${deviceId}`, details: { gallons, pct_full: calibratedPct, tank_capacity: tankCapacity }, source: 'mqttService', level: 'info' });
     }
   }
 
@@ -179,9 +167,7 @@ client.on('message', async (topic: string, message: Buffer) => {
     const readings = { metric, value };
 
     const { success, dbError } = await appendEnvironmentReading({ device_id: deviceId, room_id: roomId, readings });
-    if (success) {
-      await appLog({ message: `Environment reading saved: ${metric}`, details: { topic, deviceId, readings }, source: 'mqttService', level: 'info' });
-    } else {
+    if (!success) {
       await appLog({ message: 'Failed to persist environment reading', details: { topic, deviceId, readings, debugId: dbError?.debugId }, source: 'mqttService', level: 'error' });
     }
   }

@@ -378,31 +378,50 @@ export async function getLatestEnvironmentReading(
 
 // ── Logging ───────────────────────────────────────────────────────────────────
 
-const API_LOG_MAX_ROWS = parseInt(process.env.API_LOG_MAX_ROWS ?? '50000', 10);
+// High-frequency polling endpoints that produce no signal — suppress from api_logs.
+// Errors (4xx/5xx) on these paths are still logged regardless.
+const API_LOG_SUPPRESSED_PATHS = new Set([
+  '/api/stats',
+  '/api/can-water',
+  '/api/health',
+  '/api/config',
+  '/api/devices/status',
+  '/api/stats/sensor-stability',
+  '/api/weather',
+  '/api/ai-summary',
+  '/api/display-stats',
+]);
+
+const LOG_RETENTION_DAYS = parseInt(process.env.LOG_RETENTION_DAYS ?? '30', 10);
+
+async function pruneOldLogs(): Promise<void> {
+  await sql`DELETE FROM api_logs  WHERE timestamp  < NOW() - INTERVAL '1 day' * ${sql.val(LOG_RETENTION_DAYS)}`.execute(db);
+  await sql`DELETE FROM app_logs  WHERE timestamp  < NOW() - INTERVAL '1 day' * ${sql.val(LOG_RETENTION_DAYS)}`.execute(db);
+  await sql`DELETE FROM device_logs WHERE timestamp < NOW() - INTERVAL '1 day' * ${sql.val(LOG_RETENTION_DAYS)}`.execute(db);
+}
+
+// Prune once on startup, then every 24 hours
+pruneOldLogs().catch(() => {});
+setInterval(() => pruneOldLogs().catch(() => {}), 24 * 60 * 60 * 1000);
 
 async function appendApiLog({ req, res }: { req: Request; res: Response }): Promise<void> {
+  const path = req.path ?? req.originalUrl;
+  const status = res.statusCode ?? 200;
+
+  // Suppress noisy polling paths unless they errored
+  if (API_LOG_SUPPRESSED_PATHS.has(path) && status < 400) return;
+
   const body = res.locals.responseBody as Record<string, unknown> | undefined;
   await db
     .insertInto('api_logs')
     .values({
-      path: req.path ?? req.originalUrl,
+      path,
       request_body: req.body != null ? JSON.stringify(req.body) : null,
-      status_code: res.statusCode ?? null,
+      status_code: status,
       response_body: body != null ? JSON.stringify(body) : null,
       response_time_ms: req.startTime ? Date.now() - req.startTime : null,
     })
     .execute();
-
-  try {
-    await sql`
-      DELETE FROM api_logs
-      WHERE id <= (
-        SELECT id FROM api_logs ORDER BY id DESC LIMIT 1 OFFSET ${sql.val(API_LOG_MAX_ROWS)}
-      )
-    `.execute(db);
-  } catch (err) {
-    console.log('Failed to trim api_logs:', err);
-  }
 }
 
 async function appendAppLog({
