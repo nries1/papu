@@ -82,7 +82,7 @@ async function generateAndSaveSummary(): Promise<void> {
 
     const response = await axios.post<{ message: { content: string } }>(
       process.env.OLLAMA_URL ?? 'http://ollama:11434/api/chat',
-      { model: 'llama3.2', messages: [{ role: 'user', content: prompt }], stream: false }
+      { model: process.env.OLLAMA_MODEL ?? 'qwen3.5:9b', messages: [{ role: 'user', content: prompt }], stream: false }
     );
 
     const summary = response.data.message.content;
