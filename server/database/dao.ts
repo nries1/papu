@@ -1190,3 +1190,36 @@ export async function upsertVisionPerson(
   );
 }
 
+// ── Chat evals ────────────────────────────────────────────────────────────────
+
+export async function insertChatEval(
+  sessionKey: string,
+  question: string,
+  response: string,
+  responseTimeMs: number
+): Promise<{ success: boolean; id: number | null; dbError?: DbError }> {
+  try {
+    const row = await db
+      .insertInto('chat_evals')
+      .values({ session_key: sessionKey, question, response, response_time_ms: responseTimeMs })
+      .returning('id')
+      .executeTakeFirstOrThrow();
+    return { success: true, id: row.id };
+  } catch (err) {
+    return { success: false, id: null, dbError: await createDbError(err, 'insertChatEval') };
+  }
+}
+
+export async function updateChatEvalRating(
+  id: number,
+  field: 'quality' | 'correctness',
+  value: boolean
+): Promise<{ success: boolean; dbError?: DbError }> {
+  return tryMutate('updateChatEvalRating', () => {
+    if (field === 'quality') {
+      return db.updateTable('chat_evals').set({ quality: value }).where('id', '=', id).execute().then(() => undefined);
+    }
+    return db.updateTable('chat_evals').set({ correctness: value }).where('id', '=', id).execute().then(() => undefined);
+  });
+}
+

@@ -9,6 +9,7 @@ import { up as up006 } from './migrations/006_home_knowledge_refactor';
 import { up as up007 } from './migrations/007_vision_people';
 import { up as up008 } from './migrations/008_log_cleanup';
 import { up as up009 } from './migrations/009_drop_db_logs';
+import { up as up010 } from './migrations/010_chat_evals';
 
 async function ensureMigrationsTable(): Promise<void> {
   await sql`
@@ -50,6 +51,7 @@ async function main() {
     await runMigration('007_vision_people', up007);
     await runMigration('008_log_cleanup', up008);
     await runMigration('009_drop_db_logs', up009);
+    await runMigration('010_chat_evals', up010);
     console.log('Migrations complete.');
   } catch (err) {
     console.error('Migration failed:', err);

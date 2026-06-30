@@ -131,6 +131,17 @@ interface VisionPeopleTable {
   photo_count: number;
 }
 
+interface ChatEvalsTable {
+  id: Generated<number>;
+  session_key: string;
+  question: string;
+  response: string;
+  response_time_ms: number;
+  quality: boolean | null;
+  correctness: boolean | null;
+  timestamp: Generated<Date>;
+}
+
 export interface Database {
   watering_events: WateringEventsTable;
   tank_readings: TankReadingsTable;
@@ -148,6 +159,7 @@ export interface Database {
   chat_messages: ChatMessagesTable;
   home_knowledge: HomeKnowledgeTable;
   vision_people: VisionPeopleTable;
+  chat_evals: ChatEvalsTable;
   schema_migrations: SchemaMigrationsTable;
 }
 

@@ -16,7 +16,7 @@ export interface OllamaMessage {
 async function callOllama(messages: Message[], tools?: object[]): Promise<OllamaMessage> {
   try {
     const body: Record<string, unknown> = {
-      model: process.env.OLLAMA_MODEL ?? 'qwen3:4b',
+      model: process.env.OLLAMA_MODEL ?? 'qwen2.5:3b',
       messages,
       stream: false,
     };
@@ -26,7 +26,9 @@ async function callOllama(messages: Message[], tools?: object[]): Promise<Ollama
       process.env.OLLAMA_URL ?? 'http://ollama:11434/api/chat',
       body
     );
-    return response.data.message;
+    const msg = response.data.message;
+    if (msg.content) msg.content = msg.content.trim();
+    return msg;
   } catch (err) {
     await appLog({
       message: 'Ollama request failed',

@@ -47,6 +47,8 @@ import {
   upsertVisionPerson,
   getServiceStats,
   getDeviceHealthStats,
+  insertChatEval,
+  updateChatEvalRating,
 } from '../database/dao';
 
 const app = express();
@@ -748,11 +750,27 @@ app.post('/api/chat', async (req, res) => {
   }
 
   try {
+    const t0 = Date.now();
     const reply = await runChatTurn(sessionKey, message, personName ?? null);
-    res.json({ reply });
+    const responseTimeMs = Date.now() - t0;
+    const evalResult = await insertChatEval(sessionKey, message, reply, responseTimeMs);
+    res.json({ reply, evalId: evalResult.id });
   } catch {
     return res.status(400).json({ error: 'The AI is currently offline.' });
   }
+});
+
+app.patch('/api/chat/eval/:id', async (req, res) => {
+  const id = parseInt(req.params.id);
+  const { field, value } = req.body as { field: string; value: unknown };
+  if (isNaN(id)) return res.status(400).json({ error: 'invalid id' });
+  if (field !== 'quality' && field !== 'correctness') {
+    return res.status(400).json({ error: 'field must be quality or correctness' });
+  }
+  if (typeof value !== 'boolean') return res.status(400).json({ error: 'value must be boolean' });
+  const result = await updateChatEvalRating(id, field, value);
+  if (!result.success) return res.status(500).json({ error: 'db error' });
+  res.json({ ok: true });
 });
 
 app.get('/api/chat/context', async (req, res) => {

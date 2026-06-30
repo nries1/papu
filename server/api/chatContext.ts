@@ -49,8 +49,16 @@ const TOOLS = [
   {
     type: 'function',
     function: {
+      name: 'list_lights',
+      description: 'Get available smart lights and their current state. Call this before control_light to find entity_ids.',
+      parameters: { type: 'object', properties: {} },
+    },
+  },
+  {
+    type: 'function',
+    function: {
       name: 'control_light',
-      description: 'Control smart lights. Use entity_ids from the lights listed in the system prompt.',
+      description: 'Control smart lights. Call list_lights first to get entity_ids if you do not already have them.',
       parameters: {
         type: 'object',
         properties: {
@@ -113,6 +121,15 @@ async function executeTool(name: string, args: Record<string, unknown>): Promise
         .join('\n');
     }
 
+    case 'list_lights': {
+      const lights = await getLightEntities();
+      const available = lights.filter((l) => l.state !== 'unavailable');
+      if (!available.length) return 'No smart lights are configured or available.';
+      return available
+        .map((l) => `${l.entity_id} (${l.friendly_name}): ${l.state}${l.brightness_pct !== undefined ? ` ${l.brightness_pct}%` : ''}`)
+        .join('\n');
+    }
+
     case 'water_plants': {
       const result = await waterPlants();
       return result.summary;
@@ -160,10 +177,9 @@ async function executeTool(name: string, args: Record<string, unknown>): Promise
 // ---------------------------------------------------------------------------
 
 export async function buildSystemPrompt(personName: string | null): Promise<string> {
-  const [summaries, users, lights] = await Promise.all([
+  const [summaries, users] = await Promise.all([
     getRecentSessionSummaries(3),
     db.selectFrom('users').selectAll().execute().catch(() => []),
-    getLightEntities().catch(() => []),
   ]);
 
   const sections: string[] = [];
@@ -172,7 +188,7 @@ export async function buildSystemPrompt(personName: string | null): Promise<stri
     `You are Papu, a home robot assistant. Be direct, concise, and honest. ` +
       `Keep replies short — one or two sentences unless the question requires more. ` +
       `Never use emojis. Never invent information you don't have. ` +
-      `If you don't know something, use search_knowledge before saying you don't know. ` +
+      `RULE: For any question about a person (their job, schedule, preferences, health, hobbies, contacts, or personal details), you MUST call search_knowledge before answering. Never say "I don't have that information" without searching first. ` +
       `Do not suggest actions unless the user asks. ` +
       `Use tools when appropriate — do not describe what you would do, just do it.`
   );
@@ -193,20 +209,12 @@ export async function buildSystemPrompt(personName: string | null): Promise<stri
     sections.push(`== Recent conversation history ==\n${summaries.join('\n')}`);
   }
 
-  const availableLights = lights.filter((l) => l.state !== 'unavailable');
-  if (availableLights.length > 0) {
-    const lightLines = availableLights
-      .map((l) => `  - ${l.entity_id} (${l.friendly_name}): ${l.state}${l.brightness_pct !== undefined ? ` ${l.brightness_pct}%` : ''}`)
-      .join('\n');
-    sections.push(`== Smart lights I can control ==\n${lightLines}`);
-  }
-
   const seeing = personName
     ? `I can currently see ${personName}.`
     : `I cannot identify who I am looking at right now.`;
   sections.push(seeing);
 
-  return sections.join('\n\n') + '\n\n/no_think';
+  return sections.join('\n\n');
 }
 
 // ---------------------------------------------------------------------------
@@ -222,13 +230,20 @@ export async function runChatTurn(
 ): Promise<string> {
   await appendChatMessage(sessionKey, 'user', userMessage);
 
-  const [systemPrompt, history] = await Promise.all([
+  const [systemPrompt, history, knowledgeHits] = await Promise.all([
     buildSystemPrompt(personName),
     getChatMessages(sessionKey),
+    searchHomeKnowledge(userMessage),
   ]);
 
+  let fullPrompt = systemPrompt;
+  if (knowledgeHits.length > 0) {
+    const facts = knowledgeHits.map((r) => `- ${r.fact}`).join('\n');
+    fullPrompt += `\n\n== Relevant facts ==\n${facts}`;
+  }
+
   const messages: AnyMessage[] = [
-    { role: 'system', content: systemPrompt },
+    { role: 'system', content: fullPrompt },
     ...history.map((m) => ({ role: m.role, content: m.content })),
   ];
 

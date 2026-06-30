@@ -197,6 +197,37 @@
     }
     #chat-send:hover { border-color: #4a7aaa; }
 
+    #eval-strip {
+      display: none;
+      align-items: center;
+      gap: 6px;
+      padding: 7px 12px;
+      background: #0c1420;
+      border: 1px solid #1a2a40;
+      border-radius: 6px;
+    }
+    .eval-lbl {
+      font-size: 8px;
+      letter-spacing: 1px;
+      color: #3a5a8a;
+      text-transform: uppercase;
+    }
+    .eval-sep { flex: 1; }
+    .eval-btn {
+      background: none;
+      border: 1px solid #1a2a40;
+      border-radius: 3px;
+      color: #3a5a8a;
+      font-family: 'Courier New', monospace;
+      font-size: 12px;
+      padding: 2px 8px;
+      cursor: pointer;
+      transition: border-color 150ms, color 150ms;
+    }
+    .eval-btn:hover { border-color: #2a4a7a; color: #7ab0e0; }
+    .eval-btn.active[data-val="true"]  { border-color: #20aa60; color: #20aa60; }
+    .eval-btn.active[data-val="false"] { border-color: #aa4020; color: #aa4020; }
+
     /* Camera feed */
     #camera-feed {
       width: 380px;
@@ -296,6 +327,16 @@
   </div>
 </div>
 
+<div id="eval-strip">
+  <span class="eval-lbl">quality</span>
+  <button class="eval-btn" data-field="quality" data-val="true">✓</button>
+  <button class="eval-btn" data-field="quality" data-val="false">✗</button>
+  <span class="eval-sep"></span>
+  <span class="eval-lbl">correct</span>
+  <button class="eval-btn" data-field="correctness" data-val="true">✓</button>
+  <button class="eval-btn" data-field="correctness" data-val="false">✗</button>
+</div>
+
 <div id="conn" class="off">● disconnected</div>
 
 <div id="chat-section">
@@ -307,7 +348,7 @@
 </div>
 
 <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_detection@0.4.1646425229/face_detection.js" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@mediapipe/face_detection@0.4.1646425229/face_detection.js" crossorigin="anonymous"></script>
 <script>
   // Config
   let config = {};
@@ -536,6 +577,7 @@
       });
       const data = await res.json();
       robotSpeak(data.reply || "Sorry, I couldn't think of a response.");
+      if (data.evalId != null) showEvalStrip(data.evalId);
     } catch {
       setVoiceState('idle');
     }
@@ -619,7 +661,7 @@
 
   // Fast path: MediaPipe local detection for pan/tilt at ~10fps
   const faceDetection = new FaceDetection({
-    locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_detection@0.4.1646425229/${f}`,
+    locateFile: (f) => `https://unpkg.com/@mediapipe/face_detection@0.4.1646425229/${f}`,
   });
   faceDetection.setOptions({ model: 'short', minDetectionConfidence: 0.5 });
   faceDetection.onResults((results) => {
@@ -685,6 +727,9 @@
   const chatLog   = document.getElementById('chat-log');
   const chatInput = document.getElementById('chat-input');
 
+  const evalStrip = document.getElementById('eval-strip');
+  let currentEvalId = null;
+
   function appendChat(cls, label, text) {
     const div = document.createElement('div');
     div.className = cls;
@@ -692,6 +737,26 @@
     chatLog.appendChild(div);
     chatLog.scrollTop = chatLog.scrollHeight;
   }
+
+  function showEvalStrip(evalId) {
+    currentEvalId = evalId;
+    evalStrip.querySelectorAll('.eval-btn').forEach(b => b.classList.remove('active'));
+    evalStrip.style.display = 'flex';
+  }
+
+  evalStrip.addEventListener('click', async (e) => {
+    const btn = e.target.closest('.eval-btn');
+    if (!btn || !currentEvalId) return;
+    const field = btn.dataset.field;
+    const value = btn.dataset.val === 'true';
+    evalStrip.querySelectorAll(`.eval-btn[data-field="${field}"]`).forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    await fetch(`/api/chat/eval/${currentEvalId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ field, value }),
+    }).catch(() => {});
+  });
 
   async function sendChat() {
     const message = chatInput.value.trim();
@@ -706,6 +771,7 @@
       });
       const data = await res.json();
       appendChat('chat-robot', 'papu', data.reply || data.error || 'No response.');
+      if (data.evalId != null) showEvalStrip(data.evalId);
     } catch {
       const err = document.createElement('div');
       err.className   = 'chat-err';
