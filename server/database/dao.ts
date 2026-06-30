@@ -1144,16 +1144,28 @@ export async function deleteHomeKnowledge(
 
 export async function searchHomeKnowledge(query: string): Promise<HomeKnowledge[]> {
   try {
-    const pattern = `%${query}%`;
+    const STOP_WORDS = new Set([
+      'what', 'where', 'when', 'who', 'which', 'how', 'does', 'did', 'the',
+      'and', 'for', 'are', 'with', 'that', 'this', 'from', 'have', 'has',
+      'you', 'your', 'they', 'their', 'there', 'here', 'about', 'know',
+    ]);
+    const tokens = query.toLowerCase().split(/\W+/).filter(w => w.length > 3 && !STOP_WORDS.has(w));
+    const searchTerms = tokens.length > 0 ? tokens : [query];
+
     return db
       .selectFrom('home_knowledge')
       .selectAll()
       .where((eb) =>
-        eb.or([
-          eb('subject', 'ilike', pattern),
-          eb('category', 'ilike', pattern),
-          eb('fact', 'ilike', pattern),
-        ])
+        eb.or(
+          searchTerms.flatMap((term) => {
+            const pat = `%${term}%`;
+            return [
+              eb('subject', 'ilike', pat),
+              eb('category', 'ilike', pat),
+              eb('fact', 'ilike', pat),
+            ];
+          })
+        )
       )
       .orderBy('subject')
       .orderBy('category')

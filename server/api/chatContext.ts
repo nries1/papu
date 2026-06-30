@@ -19,25 +19,22 @@ import { db } from '../database/db';
 // Tool definitions
 // ---------------------------------------------------------------------------
 
-const TOOLS = [
-  {
-    type: 'function',
-    function: {
-      name: 'search_knowledge',
-      description:
-        'Search the home knowledge base for facts about household members, devices, or the home. Call this whenever you need specific information to answer a question.',
-      parameters: {
-        type: 'object',
-        properties: {
-          query: {
-            type: 'string',
-            description: 'Search terms, e.g. "Arlo school" or "Nico work" or "water tower tank"',
-          },
-        },
-        required: ['query'],
+const SEARCH_TOOL = {
+  type: 'function',
+  function: {
+    name: 'search_knowledge',
+    description: 'Search the home knowledge base for facts about household members, devices, or the home.',
+    parameters: {
+      type: 'object',
+      properties: {
+        query: { type: 'string', description: 'Search terms, e.g. "Arlo school" or "Nico work"' },
       },
+      required: ['query'],
     },
   },
+};
+
+const ACTION_TOOLS = [
   {
     type: 'function',
     function: {
@@ -84,8 +81,7 @@ const TOOLS = [
     type: 'function',
     function: {
       name: 'update_knowledge',
-      description:
-        'Add, update, or delete a fact in the home knowledge base. Use search_knowledge first to find the fact ID before updating or deleting.',
+      description: 'Add, update, or delete a fact in the home knowledge base. Use when the user explicitly asks to remember, update, or forget something.',
       parameters: {
         type: 'object',
         properties: {
@@ -96,16 +92,19 @@ const TOOLS = [
             type: 'string',
             enum: ['identity', 'hobby', 'health', 'work', 'schedule', 'preference', 'social', 'home', 'contact'],
           },
-          fact: {
-            type: 'string',
-            description: 'Complete third-person sentence, e.g. "Arlo dislikes broccoli."',
-          },
+          fact: { type: 'string', description: 'Complete third-person sentence, e.g. "Arlo dislikes broccoli."' },
         },
         required: ['action'],
       },
     },
   },
 ];
+
+// When pre-search already injected facts, omit search_knowledge so the model
+// doesn't call it redundantly. Offer it only when pre-search found nothing.
+function buildTools(hasPreSearchHits: boolean): object[] {
+  return hasPreSearchHits ? ACTION_TOOLS : [SEARCH_TOOL, ...ACTION_TOOLS];
+}
 
 // ---------------------------------------------------------------------------
 // Tool executor
@@ -185,12 +184,16 @@ export async function buildSystemPrompt(personName: string | null): Promise<stri
   const sections: string[] = [];
 
   sections.push(
-    `You are Papu, a home robot assistant. Be direct, concise, and honest. ` +
-      `Keep replies short — one or two sentences unless the question requires more. ` +
-      `Never use emojis. Never invent information you don't have. ` +
-      `RULE: For any question about a person (their job, schedule, preferences, health, hobbies, contacts, or personal details), you MUST call search_knowledge before answering. Never say "I don't have that information" without searching first. ` +
-      `Do not suggest actions unless the user asks. ` +
-      `Use tools when appropriate — do not describe what you would do, just do it.`
+    `You are Papu, a home robot assistant. Answer in one sentence. No emojis. If you don't have information to answer a question, say "I don't know" — never guess or invent facts. Never mention where your information came from. Never volunteer what you don't know. Do not suggest actions unless asked. Use tools — do not describe what you would do, just do it.\n\n` +
+      `RULE: For any question about a person (their job, schedule, preferences, health, hobbies, contacts, or personal details), you MUST call search_knowledge before answering.\n\n` +
+      `Examples of correct behavior:\n` +
+      `Q: "where do I work?" → A: "You work at Meta."\n` +
+      `Q: "what time is it?" → A: "It's 3:42 PM."\n` +
+      `Q: "what are my hobbies?" → A: "You enjoy salsa dancing and yoga."\n` +
+      `Q: "turn on the lights" → [call control_light, then say] "Done."\n` +
+      `NEVER say phrases like "based on the available information", "according to the provided details", "based on the knowledge base", "I don't have details about", or "you may want to contact". These are wrong:\n` +
+      `WRONG: "Based on the available information, you work at Meta. You started working there in September 2025 according to the provided details."\n` +
+      `RIGHT: "You work at Meta."`
   );
 
   const now = new Date().toLocaleString('en-US', {
@@ -210,7 +213,7 @@ export async function buildSystemPrompt(personName: string | null): Promise<stri
   }
 
   const seeing = personName
-    ? `I can currently see ${personName}.`
+    ? `You are speaking with ${personName}. When they say "I", "me", or "my", they mean ${personName}.`
     : `I cannot identify who I am looking at right now.`;
   sections.push(seeing);
 
@@ -222,6 +225,19 @@ export async function buildSystemPrompt(personName: string | null): Promise<stri
 // ---------------------------------------------------------------------------
 
 type AnyMessage = { role: string; content: string; tool_calls?: OllamaToolCall[]; tool_call_id?: string };
+
+const TOOL_NAMES = new Set(['water_plants', 'list_lights', 'control_light', 'update_knowledge']);
+
+function parseTextToolCall(content: string): OllamaToolCall | null {
+  const match = content.trim().match(/^(\w+)\((\{[\s\S]*\})\)$/);
+  if (!match) return null;
+  if (!TOOL_NAMES.has(match[1])) return null;
+  try {
+    return { id: 'text-0', function: { name: match[1], arguments: JSON.parse(match[2]) } };
+  } catch {
+    return null;
+  }
+}
 
 export async function runChatTurn(
   sessionKey: string,
@@ -236,9 +252,12 @@ export async function runChatTurn(
     searchHomeKnowledge(userMessage),
   ]);
 
+  const SYSTEM_CATEGORIES = new Set(['system', 'device', 'room', 'mqtt', 'access', 'ai', 'people']);
+  const personalHits = knowledgeHits.filter((r) => !SYSTEM_CATEGORIES.has(r.category.toLowerCase()));
+
   let fullPrompt = systemPrompt;
-  if (knowledgeHits.length > 0) {
-    const facts = knowledgeHits.map((r) => `- ${r.fact}`).join('\n');
+  if (personalHits.length > 0) {
+    const facts = personalHits.map((r) => `- ${r.fact}`).join('\n');
     fullPrompt += `\n\n== Relevant facts ==\n${facts}`;
   }
 
@@ -247,8 +266,16 @@ export async function runChatTurn(
     ...history.map((m) => ({ role: m.role, content: m.content })),
   ];
 
+  const tools = buildTools(personalHits.length > 0);
+
   for (let round = 0; round < 5; round++) {
-    const response = await ollamaChatWithTools(messages, TOOLS);
+    const response = await ollamaChatWithTools(messages, tools);
+
+    // qwen2.5:7b sometimes outputs tool calls as plain text instead of structured tool_calls
+    if (!response.tool_calls?.length && response.content) {
+      const textCall = parseTextToolCall(response.content);
+      if (textCall) response.tool_calls = [textCall];
+    }
 
     if (!response.tool_calls?.length) {
       await appendChatMessage(sessionKey, 'assistant', response.content);
