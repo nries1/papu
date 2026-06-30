@@ -7,7 +7,7 @@ export async function ollamaChat(messages: Message[]): Promise<string> {
   try {
     const response = await axios.post<{ message: { content: string } }>(
       process.env.OLLAMA_URL ?? 'http://ollama:11434/api/chat',
-      { model: process.env.OLLAMA_MODEL ?? 'qwen3.5:9b', messages, stream: false }
+      { model: process.env.OLLAMA_MODEL ?? 'qwen3:4b', messages, stream: false }
     );
     return response.data.message.content;
   } catch (err) {
