@@ -1,15 +1,32 @@
 import axios from 'axios';
 import { appLog } from '../database/dao';
 
-type Message = { role: string; content: string };
+type Message = { role: string; content: string; tool_calls?: OllamaToolCall[]; tool_call_id?: string };
 
-export async function ollamaChat(messages: Message[]): Promise<string> {
+export interface OllamaToolCall {
+  id: string;
+  function: { name: string; arguments: Record<string, unknown> };
+}
+
+export interface OllamaMessage {
+  content: string;
+  tool_calls?: OllamaToolCall[];
+}
+
+async function callOllama(messages: Message[], tools?: object[]): Promise<OllamaMessage> {
   try {
-    const response = await axios.post<{ message: { content: string } }>(
+    const body: Record<string, unknown> = {
+      model: process.env.OLLAMA_MODEL ?? 'qwen3:4b',
+      messages,
+      stream: false,
+    };
+    if (tools?.length) body.tools = tools;
+
+    const response = await axios.post<{ message: OllamaMessage }>(
       process.env.OLLAMA_URL ?? 'http://ollama:11434/api/chat',
-      { model: process.env.OLLAMA_MODEL ?? 'qwen3:4b', messages, stream: false }
+      body
     );
-    return response.data.message.content;
+    return response.data.message;
   } catch (err) {
     await appLog({
       message: 'Ollama request failed',
@@ -24,4 +41,13 @@ export async function ollamaChat(messages: Message[]): Promise<string> {
     });
     throw err;
   }
+}
+
+export async function ollamaChat(messages: Message[]): Promise<string> {
+  const msg = await callOllama(messages);
+  return msg.content;
+}
+
+export async function ollamaChatWithTools(messages: Message[], tools: object[]): Promise<OllamaMessage> {
+  return callOllama(messages, tools);
 }

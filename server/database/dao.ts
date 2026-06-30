@@ -1142,6 +1142,27 @@ export async function deleteHomeKnowledge(
   );
 }
 
+export async function searchHomeKnowledge(query: string): Promise<HomeKnowledge[]> {
+  try {
+    const pattern = `%${query}%`;
+    return db
+      .selectFrom('home_knowledge')
+      .selectAll()
+      .where((eb) =>
+        eb.or([
+          eb('subject', 'ilike', pattern),
+          eb('category', 'ilike', pattern),
+          eb('fact', 'ilike', pattern),
+        ])
+      )
+      .orderBy('subject')
+      .orderBy('category')
+      .execute();
+  } catch {
+    return [];
+  }
+}
+
 export async function getVisionPeople(): Promise<VisionPerson[]> {
   try {
     return db.selectFrom('vision_people').selectAll().orderBy('name').execute();

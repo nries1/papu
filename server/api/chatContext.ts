@@ -1,8 +1,9 @@
-import { ollamaChat } from './ollama';
-import { waterPlants, getLightEntities, controlLight, LightCommand } from './homeActions';
-import type { LightEntityInfo } from './homeActions';
+import { ollamaChat, ollamaChatWithTools } from './ollama';
+import type { OllamaToolCall } from './ollama';
+import { waterPlants, getLightEntities, controlLight } from './homeActions';
+import type { LightCommand } from './homeActions';
 import {
-  getAllHomeKnowledge,
+  searchHomeKnowledge,
   insertHomeKnowledge,
   updateHomeKnowledge,
   deleteHomeKnowledge,
@@ -13,254 +14,156 @@ import {
   appLog,
 } from '../database/dao';
 import { db } from '../database/db';
-import type { HomeKnowledge } from '../database/types';
 
-const UPDATE_TRIGGERS = [
-  'remember that',
-  'update your knowledge',
-  'update your memory',
-  'update your notes',
-  'make a note',
-  'note that',
-  'take note',
-  'add to your knowledge',
-  'forget that',
+// ---------------------------------------------------------------------------
+// Tool definitions
+// ---------------------------------------------------------------------------
+
+const TOOLS = [
+  {
+    type: 'function',
+    function: {
+      name: 'search_knowledge',
+      description:
+        'Search the home knowledge base for facts about household members, devices, or the home. Call this whenever you need specific information to answer a question.',
+      parameters: {
+        type: 'object',
+        properties: {
+          query: {
+            type: 'string',
+            description: 'Search terms, e.g. "Arlo school" or "Nico work" or "water tower tank"',
+          },
+        },
+        required: ['query'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'water_plants',
+      description: 'Start watering all configured plants.',
+      parameters: { type: 'object', properties: {} },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'control_light',
+      description: 'Control smart lights. Use entity_ids from the lights listed in the system prompt.',
+      parameters: {
+        type: 'object',
+        properties: {
+          entity_ids: {
+            type: 'array',
+            items: { type: 'string' },
+            description: 'One or more light entity_ids to control.',
+          },
+          action: { type: 'string', enum: ['turn_on', 'turn_off'] },
+          brightness_pct: { type: 'number', description: 'Brightness 1–100. Only for turn_on.' },
+          rgb_color: {
+            type: 'array',
+            items: { type: 'number' },
+            description: '[r, g, b] each 0–255. Only for turn_on.',
+          },
+          kelvin: { type: 'number', description: 'Color temperature in Kelvin. Only for turn_on.' },
+        },
+        required: ['entity_ids', 'action'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'update_knowledge',
+      description:
+        'Add, update, or delete a fact in the home knowledge base. Use search_knowledge first to find the fact ID before updating or deleting.',
+      parameters: {
+        type: 'object',
+        properties: {
+          action: { type: 'string', enum: ['add', 'update', 'delete'] },
+          id: { type: 'number', description: 'Fact ID — required for update and delete.' },
+          subject: { type: 'string', description: 'The person or thing the fact is about.' },
+          category: {
+            type: 'string',
+            enum: ['identity', 'hobby', 'health', 'work', 'schedule', 'preference', 'social', 'home', 'contact'],
+          },
+          fact: {
+            type: 'string',
+            description: 'Complete third-person sentence, e.g. "Arlo dislikes broccoli."',
+          },
+        },
+        required: ['action'],
+      },
+    },
+  },
 ];
 
-function looksLikeKnowledgeUpdate(message: string): boolean {
-  const lower = message.toLowerCase();
-  return UPDATE_TRIGGERS.some((t) => lower.includes(t));
-}
+// ---------------------------------------------------------------------------
+// Tool executor
+// ---------------------------------------------------------------------------
 
-const WATERING_TRIGGERS = [
-  'water the plants',
-  'water plants',
-  'start watering',
-  'water them',
-  'turn on the water',
-  'run the pump',
-];
-
-function looksLikeWaterRequest(message: string): boolean {
-  const lower = message.toLowerCase();
-  return WATERING_TRIGGERS.some((t) => lower.includes(t));
-}
-
-const LIGHT_KEYWORDS = ['light', 'lights', 'lamp', 'bulb', 'dim', 'brighten', 'bright', 'couch', 'kitchen', 'bedroom', 'hallway', 'living room'];
-
-function looksLikeLightRequest(message: string): boolean {
-  const lower = message.toLowerCase();
-  return LIGHT_KEYWORDS.some((k) => lower.includes(k));
-}
-
-const SCENE_PRESETS: Record<string, { brightness_pct: number; rgb_color: [number, number, number] }> = {
-  movie: { brightness_pct: 15, rgb_color: [255, 100, 20] },
-  relax: { brightness_pct: 35, rgb_color: [255, 170, 60] },
-  cozy: { brightness_pct: 35, rgb_color: [255, 170, 60] },
-  morning: { brightness_pct: 80, rgb_color: [200, 225, 255] },
-  focus: { brightness_pct: 100, rgb_color: [220, 230, 255] },
-  bright: { brightness_pct: 100, rgb_color: [255, 255, 255] },
-};
-
-const SCENE_LIST = Object.entries(SCENE_PRESETS)
-  .map(([name, p]) => `"${name}": ${p.brightness_pct}% brightness, rgb [${p.rgb_color.join(',')}]`)
-  .join('; ');
-
-// Room aliases: keyword → filter function against available entities
-const ROOM_ALIASES: Array<[string, (e: LightEntityInfo) => boolean]> = [
-  ['all lights', () => true],
-  ['all the lights', () => true],
-  ['every light', () => true],
-  ['living room', (e) => e.entity_id.includes('couch')],
-  ['couch', (e) => e.entity_id.includes('couch')],
-  ['kitchen', (e) => e.entity_id.includes('kitchen')],
-  ['bedroom', (e) => e.entity_id.includes('bedroom')],
-  ['hallway', (e) => e.entity_id.includes('hallway')],
-];
-
-// Fast rule-based parser for simple on/off commands. Returns null if too complex for rules.
-function trySimpleLightParse(message: string, availableLights: LightEntityInfo[]): LightCommand | null {
-  const lower = message.toLowerCase();
-
-  const isOff = /\boff\b/.test(lower);
-  const isOn = /\bon\b/.test(lower);
-  if (!isOff && !isOn) return null;
-  const action: 'turn_on' | 'turn_off' = isOff ? 'turn_off' : 'turn_on';
-
-  // Reject if this looks like it has color/brightness/scene modifiers — let LLM handle those
-  const hasComplex = /\b(dim|bright|percent|%|color|colour|warm|cool|movie|scene|morning|relax|cozy|focus|kelvin|rgb)\b/.test(lower);
-  if (hasComplex) return null;
-
-  const matched = new Set<string>();
-  for (const [pattern, matcher] of ROOM_ALIASES) {
-    if (lower.includes(pattern)) {
-      availableLights.filter(matcher).forEach((l) => matched.add(l.entity_id));
+async function executeTool(name: string, args: Record<string, unknown>): Promise<string> {
+  switch (name) {
+    case 'search_knowledge': {
+      const results = await searchHomeKnowledge(args.query as string);
+      if (!results.length) return 'No matching facts found.';
+      return results
+        .map((r) => `[id:${r.id}] [${r.subject} / ${r.category}] ${r.fact}`)
+        .join('\n');
     }
-  }
-  if (!matched.size) return null;
 
-  return { entity_ids: [...matched], action };
-}
+    case 'water_plants': {
+      const result = await waterPlants();
+      return result.summary;
+    }
 
-async function detectAndExecuteLightCommand(
-  userMessage: string,
-  availableLights: LightEntityInfo[]
-): Promise<{ executed: boolean; summary: string }> {
-  if (!availableLights.length) return { executed: false, summary: 'No smart lights are available.' };
+    case 'control_light': {
+      const cmd: LightCommand = {
+        entity_ids: args.entity_ids as string[],
+        action: args.action as 'turn_on' | 'turn_off',
+      };
+      if (args.brightness_pct !== undefined) cmd.brightness_pct = args.brightness_pct as number;
+      if (args.rgb_color) cmd.rgb_color = args.rgb_color as [number, number, number];
+      if (args.kelvin) cmd.kelvin = args.kelvin as number;
+      const result = await controlLight(cmd);
+      return result.summary;
+    }
 
-  // Fast path: try rule-based parsing first (reliable, no LLM needed)
-  const simple = trySimpleLightParse(userMessage, availableLights);
-  if (simple) {
-    await appLog({ message: 'light simple parse', details: { userMessage, cmd: simple }, source: 'chatContext', level: 'info' });
-    const result = await controlLight(simple);
-    await appLog({ message: 'light control result', details: { success: result.success, summary: result.summary }, source: 'chatContext', level: result.success ? 'info' : 'error' });
-    return { executed: result.success, summary: result.summary };
-  }
-
-  // Slow path: LLM for complex commands (color, brightness, scenes)
-  const roomMap = ROOM_ALIASES
-    .map(([name]) => {
-      const matches = availableLights.filter(ROOM_ALIASES.find(([n]) => n === name)![1]).map((l) => l.entity_id);
-      return matches.length ? `  - "${name}": ${matches.join(', ')}` : null;
-    })
-    .filter(Boolean)
-    .join('\n');
-
-  const allIds = availableLights.map((l) => `${l.entity_id} (${l.friendly_name})`).join(', ');
-
-  const prompt = `Control smart lights. Extract a command from the user request.
-
-Room groups:
-${roomMap}
-
-All lights: ${allIds}
-
-Scenes: ${SCENE_LIST}
-
-User: "${userMessage}"
-
-Reply with ONLY a JSON object — no explanation, no markdown:
-{"entity_ids":["light.example"],"action":"turn_on","brightness_pct":50,"rgb_color":[255,100,0]}
-
-Only include brightness_pct, rgb_color, or kelvin when the user specifies them or names a scene.
-If no lights apply, reply with: null`;
-
-  let raw = '';
-  try {
-    raw = await ollamaChat([{ role: 'user', content: prompt }]);
-
-    await appLog({ message: 'light llm parse', details: { userMessage, llmResponse: raw }, source: 'chatContext', level: 'info' });
-
-    const trimmed = raw.trim();
-    if (/^null/i.test(trimmed)) return { executed: false, summary: 'I couldn\'t figure out which lights you meant.' };
-
-    const jsonMatch = raw.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) return { executed: false, summary: 'Could not parse a light command from that request.' };
-
-    const parsed = JSON.parse(jsonMatch[0]) as Partial<LightCommand>;
-    if (!parsed.entity_ids || !parsed.action) return { executed: false, summary: 'Light command was incomplete.' };
-
-    const validIds = new Set(availableLights.map((l) => l.entity_id));
-    const filteredIds = parsed.entity_ids.filter((id) => validIds.has(id));
-
-    await appLog({ message: 'light llm resolved', details: { parsed, filteredIds }, source: 'chatContext', level: 'info' });
-
-    if (!filteredIds.length) return { executed: false, summary: `No matching lights found. Available rooms: couch/living room, kitchen, bedroom, hallway.` };
-
-    const cmd: LightCommand = {
-      entity_ids: filteredIds,
-      action: parsed.action,
-      ...(parsed.brightness_pct !== undefined && { brightness_pct: parsed.brightness_pct }),
-      ...(parsed.rgb_color && { rgb_color: parsed.rgb_color }),
-      ...(parsed.kelvin && { kelvin: parsed.kelvin }),
-    };
-
-    const result = await controlLight(cmd);
-    await appLog({ message: 'light control result', details: { cmd, success: result.success, summary: result.summary }, source: 'chatContext', level: result.success ? 'info' : 'error' });
-    return { executed: result.success, summary: result.summary };
-  } catch (e) {
-    await appLog({ message: e instanceof Error ? e : new Error(String(e)), details: { userMessage, llmResponse: raw }, source: 'chatContext', level: 'error' });
-    return { executed: false, summary: `Light control error: ${e instanceof Error ? e.message : String(e)}` };
-  }
-}
-
-interface KnowledgeChange {
-  action: 'add' | 'update' | 'delete';
-  id?: number;
-  subject?: string;
-  category?: string;
-  fact?: string;
-}
-
-async function detectAndApplyKnowledgeUpdates(
-  userMessage: string,
-  existingFacts: HomeKnowledge[]
-): Promise<{ updated: boolean; summary: string }> {
-  const factsContext = existingFacts.length
-    ? existingFacts.map((f) => `  [id:${f.id}] [${f.subject} / ${f.category}] ${f.fact}`).join('\n')
-    : '  (none yet)';
-
-  const prompt = `You are a knowledge base manager for Papu, a home robot assistant.
-
-Current knowledge base:
-${factsContext}
-
-The user said: "${userMessage}"
-
-Extract the knowledge base changes requested. For each change:
-- "add": brand-new fact not already in the list (provide subject, category, fact)
-- "update": replace an existing fact (provide id from the list, plus new subject/category/fact)
-- "delete": remove a fact entirely (provide id only)
-
-Categories: identity, hobby, health, work, schedule, preference, social, home, contact
-
-Rules:
-- Write facts as complete third-person sentences (e.g. "Arlo does not like watching Ms. Rachel.")
-- When something is said to be no longer true, prefer "update" over "delete" — rewrite the fact
-- subject should be the person or thing the fact is about
-
-Return ONLY a valid JSON array. If nothing should change, return [].
-[{"action":"add|update|delete","id":null,"subject":"...","category":"...","fact":"..."}]`;
-
-  try {
-    const raw = await ollamaChat([{ role: 'user', content: prompt }]);
-    const match = raw.match(/\[[\s\S]*\]/);
-    if (!match) return { updated: false, summary: '' };
-    const changes: KnowledgeChange[] = JSON.parse(match[0]);
-    if (!Array.isArray(changes) || !changes.length) return { updated: false, summary: '' };
-
-    const applied: string[] = [];
-    for (const change of changes) {
-      if (change.action === 'add' && change.subject && change.category && change.fact) {
-        await insertHomeKnowledge(change.subject, change.category, change.fact);
-        applied.push(`Added: "${change.fact}"`);
-      } else if (change.action === 'update' && change.id && change.subject && change.category && change.fact) {
-        await updateHomeKnowledge(change.id, change.subject, change.category, change.fact);
-        applied.push(`Updated: "${change.fact}"`);
-      } else if (change.action === 'delete' && change.id) {
-        const existing = existingFacts.find((f) => f.id === change.id);
-        await deleteHomeKnowledge(change.id);
-        applied.push(`Removed: "${existing?.fact ?? `fact #${change.id}`}"`);
+    case 'update_knowledge': {
+      const action = args.action as string;
+      if (action === 'add') {
+        await insertHomeKnowledge(args.subject as string, args.category as string, args.fact as string);
+        return `Added: "${args.fact}"`;
+      } else if (action === 'update') {
+        await updateHomeKnowledge(
+          args.id as number,
+          args.subject as string,
+          args.category as string,
+          args.fact as string
+        );
+        return `Updated fact ${args.id}: "${args.fact}"`;
+      } else if (action === 'delete') {
+        await deleteHomeKnowledge(args.id as number);
+        return `Deleted fact ${args.id}.`;
       }
+      return 'Unknown action.';
     }
 
-    return { updated: applied.length > 0, summary: applied.join('\n') };
-  } catch {
-    return { updated: false, summary: '' };
+    default:
+      return `Unknown tool: ${name}`;
   }
 }
 
-// Assembles the system prompt from home knowledge + session summaries + current context.
-export async function buildSystemPrompt(
-  personName: string | null,
-  pendingUpdate: string | null = null,
-  pendingAction: string | null = null
-): Promise<string> {
-  const [knowledgeRows, summaries, users, lights] = await Promise.all([
-    getAllHomeKnowledge(),
-    getRecentSessionSummaries(5),
+// ---------------------------------------------------------------------------
+// System prompt — lean by design, model fetches knowledge via search_knowledge
+// ---------------------------------------------------------------------------
+
+export async function buildSystemPrompt(personName: string | null): Promise<string> {
+  const [summaries, users, lights] = await Promise.all([
+    getRecentSessionSummaries(3),
     db.selectFrom('users').selectAll().execute().catch(() => []),
-    getLightEntities().catch(() => [] as LightEntityInfo[]),
+    getLightEntities().catch(() => []),
   ]);
 
   const sections: string[] = [];
@@ -268,35 +171,32 @@ export async function buildSystemPrompt(
   sections.push(
     `You are Papu, a home robot assistant. Be direct, concise, and honest. ` +
       `Keep replies short — one or two sentences unless the question requires more. ` +
-      `Never use emojis. Never invent information you don't have (sensor readings, schedules, locations, etc.). ` +
-      `If you don't know something or can't do something, say so plainly. ` +
-      `Do not suggest actions unless the user asks.`
+      `Never use emojis. Never invent information you don't have. ` +
+      `If you don't know something, use search_knowledge before saying you don't know. ` +
+      `Do not suggest actions unless the user asks. ` +
+      `Use tools when appropriate — do not describe what you would do, just do it.`
   );
 
-  if (knowledgeRows.length > 0) {
-    const bySubject: Record<string, string[]> = {};
-    for (const row of knowledgeRows) {
-      if (!bySubject[row.subject]) bySubject[row.subject] = [];
-      bySubject[row.subject].push(`[${row.category}] ${row.fact}`);
-    }
-    const knowledgeText = Object.entries(bySubject)
-      .map(([subject, lines]) => `== ${subject} ==\n${lines.join('\n')}`)
-      .join('\n\n');
-    sections.push(`== What I know about this home ==\n\n${knowledgeText}`);
-  }
+  const now = new Date().toLocaleString('en-US', {
+    timeZone: 'America/New_York',
+    dateStyle: 'full',
+    timeStyle: 'short',
+  });
+  sections.push(`The current date and time is ${now}.`);
 
   if (users.length > 0) {
-    const peopleLines = users.map((u) => `- ${u.display_name} (${u.email})`).join('\n');
+    const peopleLines = users.map((u: any) => `- ${u.display_name} (${u.email})`).join('\n');
     sections.push(`== People who live here ==\n${peopleLines}`);
   }
 
   if (summaries.length > 0) {
-    sections.push(`== My memory of past conversations ==\n${summaries.join('\n')}`);
+    sections.push(`== Recent conversation history ==\n${summaries.join('\n')}`);
   }
 
-  if (lights.length > 0) {
-    const lightLines = lights
-      .map((l) => `  - ${l.friendly_name}: ${l.state}${l.brightness_pct !== undefined ? ` (${l.brightness_pct}%)` : ''}`)
+  const availableLights = lights.filter((l) => l.state !== 'unavailable');
+  if (availableLights.length > 0) {
+    const lightLines = availableLights
+      .map((l) => `  - ${l.entity_id} (${l.friendly_name}): ${l.state}${l.brightness_pct !== undefined ? ` ${l.brightness_pct}%` : ''}`)
       .join('\n');
     sections.push(`== Smart lights I can control ==\n${lightLines}`);
   }
@@ -306,26 +206,15 @@ export async function buildSystemPrompt(
     : `I cannot identify who I am looking at right now.`;
   sections.push(seeing);
 
-  if (pendingUpdate) {
-    sections.push(
-      `== Knowledge base just updated ==\n` +
-        `You just updated your memory based on what the user told you:\n${pendingUpdate}\n` +
-        `Briefly acknowledge these changes naturally in your reply.`
-    );
-  }
-
-  if (pendingAction) {
-    sections.push(
-      `== Home action result ==\n` +
-        `The system attempted to perform a home action. Result:\n${pendingAction}\n` +
-        `Report this result accurately — if it succeeded, confirm it; if it failed, say so honestly. Do NOT claim an action was taken if the result indicates failure.`
-    );
-  }
-
   return sections.join('\n\n') + '\n\n/no_think';
 }
 
-// Runs the full chat turn: saves the user message, queries Ollama with full context, saves reply.
+// ---------------------------------------------------------------------------
+// Chat turn
+// ---------------------------------------------------------------------------
+
+type AnyMessage = { role: string; content: string; tool_calls?: OllamaToolCall[]; tool_call_id?: string };
+
 export async function runChatTurn(
   sessionKey: string,
   userMessage: string,
@@ -333,40 +222,49 @@ export async function runChatTurn(
 ): Promise<string> {
   await appendChatMessage(sessionKey, 'user', userMessage);
 
-  let pendingUpdate: string | null = null;
-  if (looksLikeKnowledgeUpdate(userMessage)) {
-    const existingFacts = await getAllHomeKnowledge();
-    const result = await detectAndApplyKnowledgeUpdates(userMessage, existingFacts);
-    if (result.updated) pendingUpdate = result.summary;
-  }
-
-  let pendingAction: string | null = null;
-  if (looksLikeWaterRequest(userMessage)) {
-    const result = await waterPlants();
-    pendingAction = result.summary;
-  } else if (looksLikeLightRequest(userMessage)) {
-    const availableLights = await getLightEntities();
-    const result = await detectAndExecuteLightCommand(userMessage, availableLights);
-    // Always set pendingAction so the LLM knows the real outcome (success or failure)
-    pendingAction = result.summary;
-  }
-
   const [systemPrompt, history] = await Promise.all([
-    buildSystemPrompt(personName, pendingUpdate, pendingAction),
+    buildSystemPrompt(personName),
     getChatMessages(sessionKey),
   ]);
 
-  const messages = [
+  const messages: AnyMessage[] = [
     { role: 'system', content: systemPrompt },
     ...history.map((m) => ({ role: m.role, content: m.content })),
   ];
 
-  const reply = await ollamaChat(messages);
-  await appendChatMessage(sessionKey, 'assistant', reply);
-  return reply;
+  for (let round = 0; round < 5; round++) {
+    const response = await ollamaChatWithTools(messages, TOOLS);
+
+    if (!response.tool_calls?.length) {
+      await appendChatMessage(sessionKey, 'assistant', response.content);
+      return response.content;
+    }
+
+    await appLog({
+      message: 'tool calls',
+      details: { calls: response.tool_calls.map((tc) => ({ name: tc.function.name, args: tc.function.arguments })) },
+      source: 'chatContext',
+      level: 'info',
+    });
+
+    messages.push({ role: 'assistant', content: response.content ?? '', tool_calls: response.tool_calls });
+
+    for (const tc of response.tool_calls) {
+      const result = await executeTool(tc.function.name, tc.function.arguments);
+      await appLog({ message: `tool:${tc.function.name}`, details: { args: tc.function.arguments, result }, source: 'chatContext', level: 'info' });
+      messages.push({ role: 'tool', content: result, tool_call_id: tc.id });
+    }
+  }
+
+  const fallback = await ollamaChat(messages);
+  await appendChatMessage(sessionKey, 'assistant', fallback);
+  return fallback;
 }
 
-// Summarizes a completed session in the background (fire-and-forget).
+// ---------------------------------------------------------------------------
+// Session summarizer (fire-and-forget)
+// ---------------------------------------------------------------------------
+
 export function summarizeSessionAsync(sessionKey: string): void {
   getChatMessages(sessionKey)
     .then((messages) => {
@@ -377,13 +275,9 @@ export function summarizeSessionAsync(sessionKey: string): void {
       return ollamaChat([
         {
           role: 'system',
-          content:
-            'You are a summarizer. Given a conversation transcript, write a 1–3 sentence summary of what was discussed. Be factual and concise.',
+          content: 'You are a summarizer. Write a 1–3 sentence summary of the conversation. Be factual and concise.',
         },
-        {
-          role: 'user',
-          content: `Please summarize this conversation:\n\n${transcript}`,
-        },
+        { role: 'user', content: `Summarize this conversation:\n\n${transcript}` },
       ]);
     })
     .then((summary) => {
