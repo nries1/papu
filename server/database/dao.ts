@@ -1104,12 +1104,14 @@ export async function getAllHomeKnowledge(): Promise<HomeKnowledge[]> {
 export async function insertHomeKnowledge(
   subject: string,
   category: string,
-  fact: string
+  fact: string,
+  embedding?: number[]
 ): Promise<{ success: boolean; dbError?: DbError; id: number | null }> {
   try {
+    const embeddingStr = embedding ? `[${embedding.join(',')}]` : null;
     const row = await db
       .insertInto('home_knowledge')
-      .values({ subject, category, fact, updated_at: new Date() })
+      .values({ subject, category, fact, embedding: embeddingStr, updated_at: new Date() })
       .returning('id')
       .executeTakeFirstOrThrow();
     return { success: true, id: row.id };
@@ -1122,16 +1124,18 @@ export async function updateHomeKnowledge(
   id: number,
   subject: string,
   category: string,
-  fact: string
+  fact: string,
+  embedding?: number[]
 ): Promise<{ success: boolean; dbError?: DbError }> {
-  return tryMutate('updateHomeKnowledge', () =>
-    db
+  return tryMutate('updateHomeKnowledge', () => {
+    const embeddingStr = embedding ? `[${embedding.join(',')}]` : null;
+    return db
       .updateTable('home_knowledge')
-      .set({ subject, category, fact, updated_at: new Date() })
+      .set({ subject, category, fact, embedding: embeddingStr, updated_at: new Date() })
       .where('id', '=', id)
       .execute()
-      .then(() => undefined)
-  );
+      .then(() => undefined);
+  });
 }
 
 export async function deleteHomeKnowledge(
@@ -1142,34 +1146,16 @@ export async function deleteHomeKnowledge(
   );
 }
 
-export async function searchHomeKnowledge(query: string): Promise<HomeKnowledge[]> {
+export async function searchHomeKnowledge(embedding: number[]): Promise<HomeKnowledge[]> {
   try {
-    const STOP_WORDS = new Set([
-      'what', 'where', 'when', 'who', 'which', 'how', 'does', 'did', 'the',
-      'and', 'for', 'are', 'with', 'that', 'this', 'from', 'have', 'has',
-      'you', 'your', 'they', 'their', 'there', 'here', 'about', 'know',
-    ]);
-    const tokens = query.toLowerCase().split(/\W+/).filter(w => w.length > 3 && !STOP_WORDS.has(w));
-    const searchTerms = tokens.length > 0 ? tokens : [query];
-
-    return db
-      .selectFrom('home_knowledge')
-      .selectAll()
-      .where((eb) =>
-        eb.or(
-          searchTerms.flatMap((term) => {
-            const pat = `%${term}%`;
-            return [
-              eb('subject', 'ilike', pat),
-              eb('category', 'ilike', pat),
-              eb('fact', 'ilike', pat),
-            ];
-          })
-        )
-      )
-      .orderBy('subject')
-      .orderBy('category')
-      .execute();
+    const vectorStr = `[${embedding.join(',')}]`;
+    const result = await sql<HomeKnowledge>`
+      SELECT * FROM home_knowledge
+      WHERE embedding IS NOT NULL
+      ORDER BY embedding <=> ${vectorStr}::vector
+      LIMIT 8
+    `.execute(db);
+    return result.rows;
   } catch {
     return [];
   }

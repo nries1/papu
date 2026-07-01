@@ -45,6 +45,15 @@ async function callOllama(messages: Message[], tools?: object[]): Promise<Ollama
   }
 }
 
+export async function getEmbedding(text: string): Promise<number[]> {
+  const base = (process.env.OLLAMA_URL ?? 'http://ollama:11434/api/chat').replace('/api/chat', '');
+  const response = await axios.post<{ embeddings: number[][] }>(`${base}/api/embed`, {
+    model: 'nomic-embed-text',
+    input: text,
+  });
+  return response.data.embeddings[0];
+}
+
 export async function ollamaChat(messages: Message[]): Promise<string> {
   const msg = await callOllama(messages);
   return msg.content;

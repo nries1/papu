@@ -121,6 +121,7 @@ interface HomeKnowledgeTable {
   subject: string;
   category: string;
   fact: string;
+  embedding: ColumnType<string | null, string | null, string | null>;
   updated_at: ColumnType<Date, Date | undefined, Date>;
 }
 

@@ -1,4 +1,4 @@
-import { ollamaChat, ollamaChatWithTools } from './ollama';
+import { ollamaChat, ollamaChatWithTools, getEmbedding } from './ollama';
 import type { OllamaToolCall } from './ollama';
 import { waterPlants, getLightEntities, controlLight } from './homeActions';
 import type { LightCommand } from './homeActions';
@@ -113,7 +113,8 @@ function buildTools(hasPreSearchHits: boolean): object[] {
 async function executeTool(name: string, args: Record<string, unknown>): Promise<string> {
   switch (name) {
     case 'search_knowledge': {
-      const results = await searchHomeKnowledge(args.query as string);
+      const embedding = await getEmbedding(args.query as string);
+      const results = await searchHomeKnowledge(embedding);
       if (!results.length) return 'No matching facts found.';
       return results
         .map((r) => `[id:${r.id}] [${r.subject} / ${r.category}] ${r.fact}`)
@@ -149,14 +150,17 @@ async function executeTool(name: string, args: Record<string, unknown>): Promise
     case 'update_knowledge': {
       const action = args.action as string;
       if (action === 'add') {
-        await insertHomeKnowledge(args.subject as string, args.category as string, args.fact as string);
+        const embedding = await getEmbedding(args.fact as string);
+        await insertHomeKnowledge(args.subject as string, args.category as string, args.fact as string, embedding);
         return `Added: "${args.fact}"`;
       } else if (action === 'update') {
+        const embedding = await getEmbedding(args.fact as string);
         await updateHomeKnowledge(
           args.id as number,
           args.subject as string,
           args.category as string,
-          args.fact as string
+          args.fact as string,
+          embedding
         );
         return `Updated fact ${args.id}: "${args.fact}"`;
       } else if (action === 'delete') {
@@ -246,12 +250,13 @@ export async function runChatTurn(
 ): Promise<string> {
   await appendChatMessage(sessionKey, 'user', userMessage);
 
-  const [systemPrompt, history, knowledgeHits] = await Promise.all([
+  const [systemPrompt, history, queryEmbedding] = await Promise.all([
     buildSystemPrompt(personName),
     getChatMessages(sessionKey),
-    searchHomeKnowledge(userMessage),
+    getEmbedding(userMessage),
   ]);
 
+  const knowledgeHits = await searchHomeKnowledge(queryEmbedding);
   const SYSTEM_CATEGORIES = new Set(['system', 'device', 'room', 'mqtt', 'access', 'ai', 'people']);
   const personalHits = knowledgeHits.filter((r) => !SYSTEM_CATEGORIES.has(r.category.toLowerCase()));
 
@@ -317,7 +322,11 @@ export function summarizeSessionAsync(sessionKey: string): void {
       return ollamaChat([
         {
           role: 'system',
-          content: 'You are a summarizer. Write a 1–3 sentence summary of the conversation. Be factual and concise.',
+          content:
+            'You are a summarizer. Write a 1–3 sentence summary of the conversation covering only things that were done or confirmed (actions taken, facts stated). ' +
+            'Do NOT include anything the assistant said it did not know, could not do, or needed to look up. ' +
+            'Do NOT include phrases like "Papu does not know", "information not available", "suggested using a search tool", or any statement of ignorance or failure. ' +
+            'Be factual and concise.',
         },
         { role: 'user', content: `Summarize this conversation:\n\n${transcript}` },
       ]);
