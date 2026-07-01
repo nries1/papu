@@ -1,7 +1,7 @@
 import { ollamaChat, ollamaChatWithTools, getEmbedding } from './ollama';
 import type { OllamaToolCall } from './ollama';
 import { waterPlants, getLightEntities, controlLight } from './homeActions';
-import { getCalendarEvents } from './calendar';
+import { getCalendarEvents, getDOECalendar } from './calendar';
 import type { LightCommand } from './homeActions';
 import {
   searchHomeKnowledge,
@@ -96,6 +96,14 @@ const ACTION_TOOLS = [
   {
     type: 'function',
     function: {
+      name: 'get_doe_calendar',
+      description: "Fetch the full NYC DOE school calendar for the current school year — holidays, closures, parent-teacher conferences, early dismissals, first/last day. Use for any question about school schedules, including dates months away.",
+      parameters: { type: 'object', properties: {} },
+    },
+  },
+  {
+    type: 'function',
+    function: {
       name: 'update_knowledge',
       description: 'Add, update, or delete a fact in the home knowledge base. Use when the user explicitly asks to remember, update, or forget something.',
       parameters: {
@@ -148,6 +156,10 @@ async function executeTool(name: string, args: Record<string, unknown>): Promise
 
     case 'get_calendar': {
       return await getCalendarEvents(args.person as string, args.days as number | undefined);
+    }
+
+    case 'get_doe_calendar': {
+      return await getDOECalendar();
     }
 
     case 'water_plants': {

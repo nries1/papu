@@ -1,4 +1,7 @@
 import ical from 'node-ical';
+import axios from 'axios';
+
+const DOE_CALENDAR_URL = 'https://www.schools.nyc.gov/calendar';
 
 const TZ = 'America/New_York';
 
@@ -44,5 +47,35 @@ export async function getCalendarEvents(person: string, daysAhead = 7): Promise<
       .join('\n');
   } catch {
     return `Failed to fetch calendar for ${person}.`;
+  }
+}
+
+let doeCache: { events: string; fetchedAt: number } | null = null;
+const DOE_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+
+export async function getDOECalendar(): Promise<string> {
+  if (doeCache && Date.now() - doeCache.fetchedAt < DOE_CACHE_TTL_MS) {
+    return doeCache.events;
+  }
+
+  try {
+    const { data: html } = await axios.get<string>(DOE_CALENDAR_URL, { timeout: 8000 });
+
+    const rawDates = [...html.matchAll(/<p class="date">([^<]+)<\/p>/g)].map((m) => m[1].trim());
+    const rawTitles = [...html.matchAll(/<h2 class="title">\s*<a[^>]*>([^<]+)<\/a>/g)].map((m) =>
+      m[1].trim().replace(/&#39;/g, "'").replace(/&amp;/g, '&').replace(/&nbsp;/g, ' ')
+    );
+
+    const lines: string[] = [];
+    for (let i = 0; i < Math.min(rawDates.length, rawTitles.length); i++) {
+      lines.push(`${rawDates[i]}: ${rawTitles[i]}`);
+    }
+
+    if (!lines.length) return 'No NYC DOE school events found.';
+    const result = lines.join('\n');
+    doeCache = { events: result, fetchedAt: Date.now() };
+    return result;
+  } catch {
+    return 'Failed to fetch NYC DOE calendar.';
   }
 }
