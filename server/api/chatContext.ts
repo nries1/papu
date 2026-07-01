@@ -1,6 +1,7 @@
 import { ollamaChat, ollamaChatWithTools, getEmbedding } from './ollama';
 import type { OllamaToolCall } from './ollama';
 import { waterPlants, getLightEntities, controlLight } from './homeActions';
+import { getCalendarEvents } from './calendar';
 import type { LightCommand } from './homeActions';
 import {
   searchHomeKnowledge,
@@ -80,6 +81,21 @@ const ACTION_TOOLS = [
   {
     type: 'function',
     function: {
+      name: 'get_calendar',
+      description: "Fetch upcoming calendar events for a household member. Use when asked about someone's schedule, appointments, plans, or what they have coming up.",
+      parameters: {
+        type: 'object',
+        properties: {
+          person: { type: 'string', description: 'Name of the person, e.g. "Nico" or "Avalon".' },
+          days: { type: 'number', description: 'How many days ahead to look. Default 7.' },
+        },
+        required: ['person'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
       name: 'update_knowledge',
       description: 'Add, update, or delete a fact in the home knowledge base. Use when the user explicitly asks to remember, update, or forget something.',
       parameters: {
@@ -128,6 +144,10 @@ async function executeTool(name: string, args: Record<string, unknown>): Promise
       return available
         .map((l) => `${l.entity_id} (${l.friendly_name}): ${l.state}${l.brightness_pct !== undefined ? ` ${l.brightness_pct}%` : ''}`)
         .join('\n');
+    }
+
+    case 'get_calendar': {
+      return await getCalendarEvents(args.person as string, args.days as number | undefined);
     }
 
     case 'water_plants': {

@@ -1770,3 +1770,13 @@
 1782874520: Client mqttjs_040e87fd [172.18.0.6:56376] disconnected: connection closed by client.
 1782874520: New connection from 172.18.0.6:53678 on port 9001.
 1782874520: New client connected from 172.18.0.6:53678 as mqttjs_f8e7837a (p4, c1, k60).
+1782875201: Client mqttjs_f8e7837a [172.18.0.6:53678] disconnected: connection closed by client.
+1782875773: Saving in-memory database to /mosquitto/data//mosquitto.db.
+1782876830: Client mqttjs_6614979f [172.18.0.2:40880] disconnected: connection closed by client.
+1782876831: New connection from 172.18.0.2:43418 on port 1883.
+1782876831: New client connected from 172.18.0.2:43418 as mqttjs_4fd7f4c9 (p4, c1, k60).
+1782876916: New connection from 172.18.0.6:44774 on port 9001.
+1782876916: New client connected from 172.18.0.6:44774 as mqttjs_e5ee3052 (p4, c1, k60).
+1782876917: Client mqttjs_e5ee3052 [172.18.0.6:44774] disconnected: connection closed by client.
+1782876917: New connection from 172.18.0.6:33890 on port 9001.
+1782876917: New client connected from 172.18.0.6:33890 as mqttjs_b60c89ff (p4, c1, k60).
