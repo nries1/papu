@@ -24,11 +24,15 @@ const SEARCH_TOOL = {
   type: 'function',
   function: {
     name: 'search_knowledge',
-    description: 'Search the home knowledge base for facts about household members, devices, or the home.',
+    description:
+      'Search the home knowledge base for facts about household members, devices, or the home.',
     parameters: {
       type: 'object',
       properties: {
-        query: { type: 'string', description: 'Search terms, e.g. "Arlo school" or "Nico work"' },
+        query: {
+          type: 'string',
+          description: 'Search terms, e.g. "Arlo school" or "Nico work"',
+        },
       },
       required: ['query'],
     },
@@ -48,7 +52,8 @@ const ACTION_TOOLS = [
     type: 'function',
     function: {
       name: 'list_lights',
-      description: 'Get available smart lights and their current state. Call this before control_light to find entity_ids.',
+      description:
+        'Get available smart lights and their current state. Call this before control_light to find entity_ids.',
       parameters: { type: 'object', properties: {} },
     },
   },
@@ -56,7 +61,8 @@ const ACTION_TOOLS = [
     type: 'function',
     function: {
       name: 'control_light',
-      description: 'Control smart lights. Call list_lights first to get entity_ids if you do not already have them.',
+      description:
+        'Control smart lights. Call list_lights first to get entity_ids if you do not already have them.',
       parameters: {
         type: 'object',
         properties: {
@@ -66,13 +72,19 @@ const ACTION_TOOLS = [
             description: 'One or more light entity_ids to control.',
           },
           action: { type: 'string', enum: ['turn_on', 'turn_off'] },
-          brightness_pct: { type: 'number', description: 'Brightness 1–100. Only for turn_on.' },
+          brightness_pct: {
+            type: 'number',
+            description: 'Brightness 1–100. Only for turn_on.',
+          },
           rgb_color: {
             type: 'array',
             items: { type: 'number' },
             description: '[r, g, b] each 0–255. Only for turn_on.',
           },
-          kelvin: { type: 'number', description: 'Color temperature in Kelvin. Only for turn_on.' },
+          kelvin: {
+            type: 'number',
+            description: 'Color temperature in Kelvin. Only for turn_on.',
+          },
         },
         required: ['entity_ids', 'action'],
       },
@@ -82,12 +94,19 @@ const ACTION_TOOLS = [
     type: 'function',
     function: {
       name: 'get_calendar',
-      description: "Fetch upcoming calendar events for a household member. Use when asked about someone's schedule, appointments, plans, or what they have coming up.",
+      description:
+        "Fetch upcoming calendar events for a household member. Use when asked about someone's schedule, appointments, plans, or what they have coming up.",
       parameters: {
         type: 'object',
         properties: {
-          person: { type: 'string', description: 'Name of the person, e.g. "Nico" or "Avalon".' },
-          days: { type: 'number', description: 'How many days ahead to look. Default 7.' },
+          person: {
+            type: 'string',
+            description: 'Name of the person, e.g. "Nico" or "Avalon".',
+          },
+          days: {
+            type: 'number',
+            description: 'How many days ahead to look. Default 7.',
+          },
         },
         required: ['person'],
       },
@@ -97,26 +116,74 @@ const ACTION_TOOLS = [
     type: 'function',
     function: {
       name: 'get_doe_calendar',
-      description: "Fetch the full NYC DOE school calendar for the current school year — holidays, closures, parent-teacher conferences, early dismissals, first/last day. Use for any question about school schedules, including dates months away.",
+      description:
+        'Fetch the full NYC DOE school calendar for the current school year — holidays, closures, parent-teacher conferences, early dismissals, first/last day. Use for any question about school schedules, including dates months away.',
       parameters: { type: 'object', properties: {} },
     },
   },
   {
     type: 'function',
     function: {
+      name: 'book_yoga_class',
+      description:
+        'Book an in-person yoga class at Y7 Studio. Use when the user asks to book, reserve, or sign up for a yoga class.',
+      parameters: {
+        type: 'object',
+        properties: {
+          date: {
+            type: 'string',
+            description: 'ISO date string, e.g. "2026-07-04"',
+          },
+          class_name: {
+            type: 'string',
+            description: 'Class type only, e.g. "WeFlowHard" or "SCULPT". Do not include teacher name. Defaults to "WeFlowHard" if not specified.',
+          },
+          preferred_time: {
+            type: 'string',
+            description: 'Optional preferred time, e.g. "7:00 PM"',
+          },
+        },
+        required: ['date', 'class_name'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
       name: 'update_knowledge',
-      description: 'Add, update, or delete a fact in the home knowledge base. Use when the user explicitly asks to remember, update, or forget something.',
+      description:
+        'Add, update, or delete a fact in the home knowledge base. Use when the user explicitly asks to remember, update, or forget something.',
       parameters: {
         type: 'object',
         properties: {
           action: { type: 'string', enum: ['add', 'update', 'delete'] },
-          id: { type: 'number', description: 'Fact ID — required for update and delete.' },
-          subject: { type: 'string', description: 'The person or thing the fact is about.' },
+          id: {
+            type: 'number',
+            description: 'Fact ID — required for update and delete.',
+          },
+          subject: {
+            type: 'string',
+            description: 'The person or thing the fact is about.',
+          },
           category: {
             type: 'string',
-            enum: ['identity', 'hobby', 'health', 'work', 'schedule', 'preference', 'social', 'home', 'contact'],
+            enum: [
+              'identity',
+              'hobby',
+              'health',
+              'work',
+              'schedule',
+              'preference',
+              'social',
+              'home',
+              'contact',
+            ],
           },
-          fact: { type: 'string', description: 'Complete third-person sentence, e.g. "Arlo dislikes broccoli."' },
+          fact: {
+            type: 'string',
+            description:
+              'Complete third-person sentence, e.g. "Arlo dislikes broccoli."',
+          },
         },
         required: ['action'],
       },
@@ -134,7 +201,10 @@ function buildTools(hasPreSearchHits: boolean): object[] {
 // Tool executor
 // ---------------------------------------------------------------------------
 
-async function executeTool(name: string, args: Record<string, unknown>): Promise<string> {
+async function executeTool(
+  name: string,
+  args: Record<string, unknown>
+): Promise<string> {
   switch (name) {
     case 'search_knowledge': {
       const embedding = await getEmbedding(args.query as string);
@@ -148,18 +218,46 @@ async function executeTool(name: string, args: Record<string, unknown>): Promise
     case 'list_lights': {
       const lights = await getLightEntities();
       const available = lights.filter((l) => l.state !== 'unavailable');
-      if (!available.length) return 'No smart lights are configured or available.';
+      if (!available.length)
+        return 'No smart lights are configured or available.';
       return available
-        .map((l) => `${l.entity_id} (${l.friendly_name}): ${l.state}${l.brightness_pct !== undefined ? ` ${l.brightness_pct}%` : ''}`)
+        .map(
+          (l) =>
+            `${l.entity_id} (${l.friendly_name}): ${l.state}${l.brightness_pct !== undefined ? ` ${l.brightness_pct}%` : ''}`
+        )
         .join('\n');
     }
 
     case 'get_calendar': {
-      return await getCalendarEvents(args.person as string, args.days as number | undefined);
+      return await getCalendarEvents(
+        args.person as string,
+        args.days as number | undefined
+      );
     }
 
     case 'get_doe_calendar': {
       return await getDOECalendar();
+    }
+
+    case 'book_yoga_class': {
+      if (!args.date) {
+        return 'Cannot book: date is required. Ask the user to clarify.';
+      }
+      try {
+        const res = await fetch('http://web-agents:3001/book-yoga', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            date: args.date,
+            className: args.class_name || 'WeFlowHard',
+            preferredTime: args.preferred_time,
+          }),
+        });
+        const json = (await res.json()) as { success: boolean; message: string };
+        return json.message ?? (json.success ? 'Booked.' : 'Booking failed.');
+      } catch (err) {
+        return `Booking service error: ${err instanceof Error ? err.message : String(err)}`;
+      }
     }
 
     case 'water_plants': {
@@ -172,8 +270,10 @@ async function executeTool(name: string, args: Record<string, unknown>): Promise
         entity_ids: args.entity_ids as string[],
         action: args.action as 'turn_on' | 'turn_off',
       };
-      if (args.brightness_pct !== undefined) cmd.brightness_pct = args.brightness_pct as number;
-      if (args.rgb_color) cmd.rgb_color = args.rgb_color as [number, number, number];
+      if (args.brightness_pct !== undefined)
+        cmd.brightness_pct = args.brightness_pct as number;
+      if (args.rgb_color)
+        cmd.rgb_color = args.rgb_color as [number, number, number];
       if (args.kelvin) cmd.kelvin = args.kelvin as number;
       const result = await controlLight(cmd);
       return result.summary;
@@ -183,7 +283,12 @@ async function executeTool(name: string, args: Record<string, unknown>): Promise
       const action = args.action as string;
       if (action === 'add') {
         const embedding = await getEmbedding(args.fact as string);
-        await insertHomeKnowledge(args.subject as string, args.category as string, args.fact as string, embedding);
+        await insertHomeKnowledge(
+          args.subject as string,
+          args.category as string,
+          args.fact as string,
+          embedding
+        );
         return `Added: "${args.fact}"`;
       } else if (action === 'update') {
         const embedding = await getEmbedding(args.fact as string);
@@ -211,10 +316,16 @@ async function executeTool(name: string, args: Record<string, unknown>): Promise
 // System prompt — lean by design, model fetches knowledge via search_knowledge
 // ---------------------------------------------------------------------------
 
-export async function buildSystemPrompt(personName: string | null): Promise<string> {
+export async function buildSystemPrompt(
+  personName: string | null
+): Promise<string> {
   const [summaries, users] = await Promise.all([
     getRecentSessionSummaries(3),
-    db.selectFrom('users').selectAll().execute().catch(() => []),
+    db
+      .selectFrom('users')
+      .selectAll()
+      .execute()
+      .catch(() => []),
   ]);
 
   const sections: string[] = [];
@@ -227,6 +338,8 @@ export async function buildSystemPrompt(personName: string | null): Promise<stri
       `Q: "what time is it?" → A: "It's 3:42 PM."\n` +
       `Q: "what are my hobbies?" → A: "You enjoy salsa dancing and yoga."\n` +
       `Q: "turn on the lights" → [call control_light, then say] "Done."\n` +
+      `Q: "book me a yoga class at noon" → ask "What date?" then call book_yoga_class once you have it.\n` +
+      `Q: "book me a yoga class on Friday at noon" → call book_yoga_class immediately.\n` +
       `NEVER say phrases like "based on the available information", "according to the provided details", "based on the knowledge base", "I don't have details about", or "you may want to contact". These are wrong:\n` +
       `WRONG: "Based on the available information, you work at Meta. You started working there in September 2025 according to the provided details."\n` +
       `RIGHT: "You work at Meta."`
@@ -240,7 +353,9 @@ export async function buildSystemPrompt(personName: string | null): Promise<stri
   sections.push(`The current date and time is ${now}.`);
 
   if (users.length > 0) {
-    const peopleLines = users.map((u: any) => `- ${u.display_name} (${u.email})`).join('\n');
+    const peopleLines = users
+      .map((u: any) => `- ${u.display_name} (${u.email})`)
+      .join('\n');
     sections.push(`== People who live here ==\n${peopleLines}`);
   }
 
@@ -260,16 +375,30 @@ export async function buildSystemPrompt(personName: string | null): Promise<stri
 // Chat turn
 // ---------------------------------------------------------------------------
 
-type AnyMessage = { role: string; content: string; tool_calls?: OllamaToolCall[]; tool_call_id?: string };
+type AnyMessage = {
+  role: string;
+  content: string;
+  tool_calls?: OllamaToolCall[];
+  tool_call_id?: string;
+};
 
-const TOOL_NAMES = new Set(['water_plants', 'list_lights', 'control_light', 'update_knowledge']);
+const TOOL_NAMES = new Set([
+  'water_plants',
+  'list_lights',
+  'control_light',
+  'update_knowledge',
+  'book_yoga_class',
+]);
 
 function parseTextToolCall(content: string): OllamaToolCall | null {
   const match = content.trim().match(/^(\w+)\((\{[\s\S]*\})\)$/);
   if (!match) return null;
   if (!TOOL_NAMES.has(match[1])) return null;
   try {
-    return { id: 'text-0', function: { name: match[1], arguments: JSON.parse(match[2]) } };
+    return {
+      id: 'text-0',
+      function: { name: match[1], arguments: JSON.parse(match[2]) },
+    };
   } catch {
     return null;
   }
@@ -289,8 +418,18 @@ export async function runChatTurn(
   ]);
 
   const knowledgeHits = await searchHomeKnowledge(queryEmbedding);
-  const SYSTEM_CATEGORIES = new Set(['system', 'device', 'room', 'mqtt', 'access', 'ai', 'people']);
-  const personalHits = knowledgeHits.filter((r) => !SYSTEM_CATEGORIES.has(r.category.toLowerCase()));
+  const SYSTEM_CATEGORIES = new Set([
+    'system',
+    'device',
+    'room',
+    'mqtt',
+    'access',
+    'ai',
+    'people',
+  ]);
+  const personalHits = knowledgeHits.filter(
+    (r) => !SYSTEM_CATEGORIES.has(r.category.toLowerCase())
+  );
 
   let fullPrompt = systemPrompt;
   if (personalHits.length > 0) {
@@ -321,16 +460,30 @@ export async function runChatTurn(
 
     await appLog({
       message: 'tool calls',
-      details: { calls: response.tool_calls.map((tc) => ({ name: tc.function.name, args: tc.function.arguments })) },
+      details: {
+        calls: response.tool_calls.map((tc) => ({
+          name: tc.function.name,
+          args: tc.function.arguments,
+        })),
+      },
       source: 'chatContext',
       level: 'info',
     });
 
-    messages.push({ role: 'assistant', content: response.content ?? '', tool_calls: response.tool_calls });
+    messages.push({
+      role: 'assistant',
+      content: response.content ?? '',
+      tool_calls: response.tool_calls,
+    });
 
     for (const tc of response.tool_calls) {
       const result = await executeTool(tc.function.name, tc.function.arguments);
-      await appLog({ message: `tool:${tc.function.name}`, details: { args: tc.function.arguments, result }, source: 'chatContext', level: 'info' });
+      await appLog({
+        message: `tool:${tc.function.name}`,
+        details: { args: tc.function.arguments, result },
+        source: 'chatContext',
+        level: 'info',
+      });
       messages.push({ role: 'tool', content: result, tool_call_id: tc.id });
     }
   }
@@ -360,7 +513,10 @@ export function summarizeSessionAsync(sessionKey: string): void {
             'Do NOT include phrases like "Papu does not know", "information not available", "suggested using a search tool", or any statement of ignorance or failure. ' +
             'Be factual and concise.',
         },
-        { role: 'user', content: `Summarize this conversation:\n\n${transcript}` },
+        {
+          role: 'user',
+          content: `Summarize this conversation:\n\n${transcript}`,
+        },
       ]);
     })
     .then((summary) => {

@@ -1,4 +1,13 @@
 services:
+  web-agents:
+    build:
+      context: ./web-agents
+    env_file:
+      - .env
+    environment:
+      - WEB_AGENT_PORT=3001
+    restart: unless-stopped
+
   # The web server
   nginx:
     image: nginx:latest
